@@ -1,0 +1,2 @@
+# mytool
+ helpful function patches
