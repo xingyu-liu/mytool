@@ -7,164 +7,7 @@ This is a temporary script file.
 
 import numpy as np
 from scipy import stats
-
-def isc(data1, data2):
-
-    """calculate inter-subject correlation along the determined axis.
-    
-    Parameters
-    ----------          
- 
-        data1: used to calculate functional connectivity, 
-            shape = [n_samples, n_features].
-        data2: used to calculate functional connectivity, 
-            shape = [n_samples, n_features].
-    
-    Returns
-    -------
-        isc: point-to-point functional connectivity list of 
-            data1 and data2, shape = [n_samples, ].
-   
-    Notes
-    -----
-        1. data1 and data2 should both be 2-dimensional.
-        2. [n_samples, n_features] should be the same in data1 and data2.
-        
-    """
-#    assert data1.ndim == 2 and data2.ndim == 2 and data1.shape == data2.shape, \
-#        'data1 and data2 should have the same shape, and both should be 2-d array.\n \' \
-#        Cannot calculate with shape {0}, {1}'.format(data1.shape, data2.shape)    
-    
-    data1 = np.nan_to_num(data1)
-    data2 = np.nan_to_num(data2)
-  
-    z_data1 = np.nan_to_num(stats.zscore(data1,axis=-1))
-    z_data2 = np.nan_to_num(stats.zscore(data2,axis=-1))
-    corr = np.sum(z_data1*z_data2,axis=-1)/(np.size(data1,-1))
-    
-    return corr
-
-
-
-def isfc(data1, data2):
-    from scipy.spatial.distance import cdist
-
-    """
-    Cal functional connectivity between data1 and data2.
-    Parameters
-    ----------
-        data1: used to calculate functional connectivity, 
-            shape = [n_samples1, n_features].
-        data2: used to calculate functional connectivity, 
-            shape = [n_samples2, n_features].
-
-    Returns
-    -------
-        isfc: functional connectivity map of data1 and data2, 
-            shape = [n_samples1, n_samples2].
-
-    Notes
-    -----
-        1. data1 and data2 should both be 2-dimensional.
-        2. n_features should be the same in data1 and data2.
-    """
-    return 1 - cdist(data1, data2, metric='correlation')
-
-
-
-def rdm_plot(data, label=None, fig_size=None, title=None, 
-             delete_diag=None, show_value=None, colormap=None):
-    
-    import matplotlib
-    import matplotlib.pyplot as plt
-    from matplotlib import cm as mpl_cm
-
-    if delete_diag is not None:
-        data[range(np.size(data,0)),range(np.size(data,0))] = 0
-    
-    if fig_size is not None:
-        fig = plt.figure(figsize=(fig_size[0],fig_size[1]))
-    else:
-        fig = plt.figure(figsize=(5,5))
-    
-    if title is not None:
-        plt.title(title)
-        
-    if colormap is not None:
-        cmap = mpl_cm.get_cmap(colormap)
-    else:
-        cmap = mpl_cm.coolwarm
-    
-    im = plt.imshow(data,cmap=cmap)
-    
-    plt.colorbar(im, fraction=0.02)
-
-    
-    if label is not None:
-        # label them with the respective list entries
-        plt.xticks(np.arange(np.size(data,1)), label,rotation=90)
-        plt.yticks(np.arange(np.size(data,0)), label)
-    
-    
-    if show_value is not None:
-        valfmt = matplotlib.ticker.StrMethodFormatter('{x:.2f}')  
-        for i in range(np.size(data,0)):
-            for j in range(np.size(data,1)):
-                plt.text(j, i, valfmt(data[i, j]), 
-                         ha="center", va="center", color="w")
-    fig.tight_layout()
-    plt.show()
-
-
-def plot_scatter_bar(matrix , x_bar=None, y_bar=None): 
-    import matplotlib.pyplot as plt
-    
-    matrix = matrix.T
-    scatter_data = np.where(matrix==1)
-    x = scatter_data[0]
-    y = scatter_data[1]
-
-    # definitions for the axes
-    plt.figure(figsize=(8, 8))
-    left, width = 0.1, 0.8
-    bottom, height = 0.1, 0.8
-    spacing = 0.005
-    if x_bar is not None:
-        height = 0.65 
-    if y_bar is not None:
-        width = 0.65
-    
-    # start with a rectangular Figure
-    rect_scatter = [left, bottom, width, height]  
-    ax_scatter = plt.axes(rect_scatter)
-    ax_scatter.set_xlim((0, matrix.shape[0]))
-    ax_scatter.set_ylim((0, matrix.shape[-1]))  
-    ax_scatter.tick_params(direction='in', top=True, right=True)
-    ax_scatter.scatter(x, y)
-
-    if x_bar is not None:
-        binwidth = 1       
-        rect_histx = [left, bottom + height + spacing, width, 0.2]
-        ax_histx = plt.axes(rect_histx)
-        ax_histx.tick_params(direction='in', labelbottom=False)
-        ax_histx.set_xlim(ax_scatter.get_xlim())
-        ax_histx.hist(x, bins=range(0, matrix.shape[0],binwidth))    
-    
-    if y_bar is not None:
-        binwidth = 1
-        rect_histy = [left + width + spacing, bottom, 0.2, height]
-        ax_histy = plt.axes(rect_histy)
-        ax_histy.tick_params(direction='in', labelleft=False)
-        ax_histy.set_ylim(ax_scatter.get_ylim())
-        ax_histy.hist(y, bins=range(0, matrix.shape[-1],binwidth), 
-                      orientation='horizontal')
-     
-
- 
-    plt.show()
-    
-    
-    
+import matplotlib.pyplot as plt
     
 def tSNR(data):
     """alculate the temporal signal-to-noise ratio (tSNR) for each vertex
@@ -191,7 +34,6 @@ def tSNR(data):
 
 
 def hist2grp(data, labels, fig_size, title, bin_amount, density):
-    import matplotlib.pyplot as plt
     
     plt.figure(figsize=(fig_size[0],fig_size[1]))
     colors = ['red', 'blue']
@@ -249,7 +91,6 @@ def corr_matrix2graph(corr_matrix):
 
 def cluster(X, last_merge_number, cluster_number):
     from time import time
-    from matplotlib import pyplot as plt
     from scipy.cluster import hierarchy
     
     t0 = time()
@@ -257,8 +98,8 @@ def cluster(X, last_merge_number, cluster_number):
     print("%.2fs" % (time() - t0))
     
     plt.figure(figsize=(8, 12))
-    dn = hierarchy.dendrogram(Z, above_threshold_color='#bcbddc',
-                               orientation='right')
+    hierarchy.dendrogram(Z, above_threshold_color='#bcbddc',
+                         orientation='right')
     plt.show()
     
     #---------- show last x merge -------------------------
@@ -291,25 +132,17 @@ def dendo_community(x):
     return sorted_x, sort_index
 
 
-def readtxt2array(txt_path, delimiter, exclude_first_line):
-    x = []
-    with open(txt_path, 'r') as f:
-        for line in f.readlines()[exclude_first_line:]:
-            if delimiter:
-                split_line = line.split(delimiter)[:-1]
-                x.append(split_line)
-            else:
-                x.append(line)                        
-    x = np.asarray(x)   
-    
-    return x
-    
+def fdr_correction(p_value):
+    """
+    Parameters
+    ----------         
+        p_value: (n, ) array_like
 
-def fdr_correction(x):
-    temp = x.argsort()
+    """    
+    temp = p_value.argsort()
     ranks = np.empty(len(temp), int)
     ranks[temp] = np.arange(len(temp)) + 1
-    fdr_Q = x * (np.size(x) / ranks)
+    fdr_Q = p_value * (np.size(p_value) / ranks)
     
     return fdr_Q
         
