@@ -8,7 +8,70 @@ This is a temporary script file.
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+
+def isc(data1, data2):
+
+    """calculate inter-subject correlation along the determined axis.
     
+    Parameters
+    ----------          
+ 
+        data1: used to calculate functional connectivity, 
+            shape = [n_samples, n_features].
+        data2: used to calculate functional connectivity, 
+            shape = [n_samples, n_features].
+    
+    Returns
+    -------
+        isc: point-to-point functional connectivity list of 
+            data1 and data2, shape = [n_samples, ].
+   
+    Notes
+    -----
+        1. data1 and data2 should both be 2-dimensional.
+        2. [n_samples, n_features] should be the same in data1 and data2.
+        
+    """
+#    assert data1.ndim == 2 and data2.ndim == 2 and data1.shape == data2.shape, \
+#        'data1 and data2 should have the same shape, and both should be 2-d array.\n \' \
+#        Cannot calculate with shape {0}, {1}'.format(data1.shape, data2.shape)    
+    
+    data1 = np.nan_to_num(data1)
+    data2 = np.nan_to_num(data2)
+  
+    z_data1 = np.nan_to_num(stats.zscore(data1,axis=-1))
+    z_data2 = np.nan_to_num(stats.zscore(data2,axis=-1))
+    corr = np.sum(z_data1*z_data2,axis=-1)/(np.size(data1,-1))
+    
+    return corr
+
+
+
+def isfc(data1, data2):
+    from scipy.spatial.distance import cdist
+
+    """Cal functional connectivity between data1 and data2.
+    
+    Parameters
+    ----------
+        data1: used to calculate functional connectivity, 
+            shape = [n_samples1, n_features].
+        data2: used to calculate functional connectivity, 
+            shape = [n_samples2, n_features].
+
+    Returns
+    -------
+        isfc: functional connectivity map of data1 and data2, 
+            shape = [n_samples1, n_samples2].
+
+    Notes
+    -----
+        1. data1 and data2 should both be 2-dimensional.
+        2. n_features should be the same in data1 and data2.
+    """
+    return 1 - cdist(data1, data2, metric='correlation')
+
+  
 def tSNR(data):
     """alculate the temporal signal-to-noise ratio (tSNR) for each vertex
     Parameters

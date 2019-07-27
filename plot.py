@@ -101,26 +101,41 @@ def scatter_bar(matrix , x_bar=None, y_bar=None):
     plt.show()
     
 
-def gradient_color_lines(data,label=None,coloarmap='viridis',marker='o'):
+def gradient_color_lines(data,x=None,label=None,ref=None,
+                         coloarmap='viridis',marker='o',markersize=3):
 
     """
     
     Parameters
     ----------
-        data: list of 2-d data 
+        data: list of 2-d array, or 1-d array if x is provided
     """
-    plt.figure()
+    fig, ax = plt.subplots()
     count = 0 
     cmap = plt.cm.get_cmap(coloarmap)
     color_norm = plt.Normalize(0,len(data))
     color = cmap(color_norm(range(len(data))))
-    for series in data:
-        plt.plot(series[0],series[1], c=color[count],
-                 marker=marker,label=label[count], markersize=3) 
-        # markerfacecolor='none'
-        count += 1
 
-    plt.legend()
+    if x is None:
+        for series in data:
+            ax.plot(series[0],series[1], c=color[count], 
+                     marker=marker, markersize=markersize)  # markerfacecolor='none'
+            count += 1
+        if ref is not None:
+            ax.plot(data[ref][0],data[ref][1],c='tab:red',
+                    marker=marker, markersize=markersize)
+    else:
+        for series in data:
+            ax.plot(x,series, c=color[count], 
+                    marker=marker, markersize=markersize) 
+            count += 1  
+        if ref is not None:
+            ax.plot(x, data[ref],c='tab:red',
+                    marker=marker, markersize=markersize)
+            
+    if label is not None:
+        ax.legend(label)
+        
     plt.show()
 
 
