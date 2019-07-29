@@ -96,6 +96,35 @@ def tSNR(data):
     return data_tSNR
 
 
+def dice(x,y):
+    """
+    parameters:
+    ----------
+        x, y: 1-d array or list. x and y have the same size 
+    """
+    dice_coef = []
+    cat = np.unique(np.asarray([x,y]))
+    for cat_i in cat:
+        x_i = list(np.where(np.asarray(x) == cat_i)[0])
+        y_i = list(np.where(np.asarray(y) == cat_i)[0])
+        dice_i = (len(set(x_i) & set(y_i))) * 2 / (
+                len(set(x_i)) + len(set(y_i)))        
+        dice_coef.append(dice_i) 
+    dice_coef = np.asarray(dice_coef).mean()
+    return dice_coef
+
+
+def perct_agreement(x,y):
+    """
+    parameters:
+    ----------
+        x, y: 1-d array or list. x and y have the same size 
+    """
+    agr_length = np.count_nonzero(np.asarray(x) == np.asarray(y))
+    length = np.asarray(x).shape[0]
+    return agr_length/length
+
+
 def hist2grp(data, labels, fig_size, title, bin_amount, density):
     
     plt.figure(figsize=(fig_size[0],fig_size[1]))
