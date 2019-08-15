@@ -34,6 +34,9 @@ def main():
     parser.add_argument('--tr',
                         default=None,
                         help='TR of bold scan in ms')
+    parser.add_argument('--events_bids_root',
+                        default=None,
+                        help='the root folder of BIDS valid events files')
 
     args = parser.parse_args()
     print(args)
@@ -71,11 +74,13 @@ def main():
         return cmd
         
     
-    def bids2fsfast(bids_root,out_dir,fsrecon_dir=None,fwhm=None,tr=None):
+    def bids2fsfast(bids_root,out_dir,
+                    fsrecon_dir=None,fwhm=None,tr=None,events_bids_root=None):
         
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)       
         
+        # convert gii files to fsfast
         os.chdir(bids_root)
         subidlist = list_dir('sub-*',subdir_only=True)
     
@@ -94,14 +99,12 @@ def main():
                 ses_dir = os.path.join(sub_dir,sesid)
                 if not os.path.exists(ses_dir):
                     os.mkdir(ses_dir) 
-
-                
+            
                 with open(os.path.join(ses_dir,'subjectname'),'w') as f:
                     f.write('{0}'.format(subid))
                 
                 os.chdir(os.path.join(bids_root,subid,sesid,'func'))
-                runidlist = list_dir('*.func.gii',subdir_only=False)
-                
+                runidlist = list_dir('*.func.gii',subdir_only=False)                
                 for runid in runidlist:
                     run_info = runid.split('_')
                     key_name = [key.split('-')[0] for key in run_info]
@@ -126,21 +129,23 @@ def main():
                         os.symlink(scr,dst)
                     
                     # shell command
-                    # creat meanval and waveform file
-                    mask_fname = '{0}space-T1w_desc-brain_mask.nii.gz'.format(
-                            runid.split('space')[0])
-                    mask_fpath = os.path.join(bids_root,subid,sesid,'func',
-                                              mask_fname)
-                    vol_fname = '{0}space-T1w_desc-preproc_bold.nii.gz'.format(
-                            runid.split('space')[0])
-                    vol_fpath = os.path.join(bids_root,subid,sesid,'func',
-                                             vol_fname)                    
-                    meanval_path = os.path.join(run_dir,'global.meanval.dat')
-                    waveform_path = os.path.join(run_dir,'global.waveform.dat')
-                    
-                    cmd = meanval_cmd(vol_fpath, mask_fpath,
-                                      meanval_path,waveform_path)
-                    subprocess.call(cmd,shell=True)
+#                    # creat meanval and waveform file
+#                    meanval_path = os.path.join(run_dir,'global.meanval.dat')
+#                    waveform_path = os.path.join(run_dir,'global.waveform.dat')
+#                    
+#                    if not os.path.exists(meanval_path):
+#                        mask_fname = ('{0}space-T1w_desc-brain_mask.nii'
+#                                      '.gz'.format(runid.split('space')[0]))
+#                        mask_fpath = os.path.join(bids_root,subid,sesid,'func',
+#                                                  mask_fname)
+#                        vol_fname = ('{0}space-T1w_desc-preproc_bold.nii'
+#                                     '.gz'.format(runid.split('space')[0]))
+#                        vol_fpath = os.path.join(bids_root,subid,sesid,'func',
+#                                                 vol_fname)                    
+#                        
+#                        cmd = meanval_cmd(vol_fpath, mask_fpath,
+#                                          meanval_path,waveform_path)
+#                        subprocess.call(cmd,shell=True)
                     
                     # gii 2 nii.gz 
                     if (fsrecon_dir is not None) and (tr is not None):
@@ -168,16 +173,63 @@ def main():
                                 nii_fpath,tr)
                         subprocess.call(cmd,shell=True)
                         
-                    else:
+                    elif (fsrecon_dir is not None) and (tr is None):
                         print('both fsrecon_dir and tr should be provided'
                               'in order to convert gii files to nifti files')
-                                          
-            print('{0} done'.format(subid))
+            print('{0} gii done'.format(subid))
+                    
+        # convert events files to fsfast
+        if events_bids_root is not None:
+            
+            os.chdir(events_bids_root)
+            subidlist = list_dir('sub-*',subdir_only=True)
+        
+            for subid in subidlist:
+                sub_dir = os.path.join(out_dir,subid)
+                if not os.path.exists(sub_dir):
+                    os.mkdir(sub_dir) 
+                
+                os.chdir(os.path.join(events_bids_root,subid))
+                sesidlist = list_dir('ses-*',subdir_only=True)
+        
+                for sesid in sesidlist:
+                    ses_dir = os.path.join(sub_dir,sesid)
+                    if not os.path.exists(ses_dir):
+                        os.mkdir(ses_dir) 
+                    
+                    os.chdir(os.path.join(events_bids_root,subid,sesid,'func'))
+                    runidlist = list_dir('*events.tsv',subdir_only=False)                
+                    for runid in runidlist:
+                        run_info = runid.split('_')
+                        key_name = [key.split('-')[0] for key in run_info]
+                        task_name = run_info[
+                                key_name.index('task')].split('-')[-1]
+                        run_num = run_info[
+                                key_name.index('run')].split('-')[-1]
+                        run_name = '{0}{1}'.format(task_name, run_num)
+                        
+                        run_dir = os.path.join(ses_dir,run_name)
+                        if not os.path.exists(run_dir):
+                            os.mkdir(run_dir) 
+                        
+                        scr = os.path.join(events_bids_root,subid,sesid,'func',
+                                           runid)
+                        dst = os.path.join(run_dir, 'events.tsv')
+                        
+                        if not os.path.exists(dst):
+                            os.symlink(scr,dst)
+            
+                print('{0} evnets done'.format(subid))
         print('all done')
         
         
     # creat FSFAST data structure
-    bids2fsfast(args.bids_root,args.out_dir,args.fsrecon_dir,args.fwhm,args.tr)
+    bids2fsfast(bids_root=args.bids_root,
+                out_dir=args.out_dir,
+                fsrecon_dir=args.fsrecon_dir,
+                fwhm=args.fwhm,
+                tr=args.tr,
+                events_bids_root=args.events_bids_root)
                 
 if __name__ == '__main__':
     main()
