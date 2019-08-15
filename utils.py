@@ -27,7 +27,6 @@ def write_list2txt(txt_path, data, delimiter=None):
             f.write('{0}{1}'.format(item,delimiter))
 
 
-
 def list_dir(dir_path,subdir_only=False):
     if subdir_only == True:
         fs = [f for f in glob.glob(dir_path) if not '.' in f]        
@@ -58,9 +57,6 @@ def bids2fsfast(bids_root,out_dir):
         for sesid in sesidlist:
             ses_dir = os.path.join(sub_dir,sesid)
             os.mkdir(ses_dir) 
-
-            func_dir = os.path.join(ses_dir,'func')
-            os.mkdir(func_dir) 
             
             with open(os.path.join(ses_dir,'subjectname'),'w') as f:
                 f.write('{0}'.format(subid))
@@ -77,11 +73,12 @@ def bids2fsfast(bids_root,out_dir):
                 hemi_name = run_info[key_name.index('hemi')].split('-')[-1][0]
                 run_name = '{0}{1}'.format(task_name, run_num)
                 
-                run_dir = os.path.join(func_dir,run_name)
+                run_dir = os.path.join(ses_dir,run_name)
                 if not os.path.exists(run_dir):
                     os.mkdir(run_dir) 
                 
-                file_name = '{0}.{1}.gii'.format(space_name,hemi_name)
+                file_name = 'fmcpr.{0}.{1}h.gii'.format(space_name,
+                                   hemi_name.lower())
                 scr = os.path.join(bids_root,subid,sesid,'func', runid)
                 dst = os.path.join(run_dir, file_name)
                 
