@@ -9,7 +9,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 
-def isc(data1, data2):
+def isc(data1, data2=None):
 
     """calculate inter-subject correlation along the determined axis.
     
@@ -36,6 +36,9 @@ def isc(data1, data2):
 #        'data1 and data2 should have the same shape, and both should be 2-d array.\n \' \
 #        Cannot calculate with shape {0}, {1}'.format(data1.shape, data2.shape)    
     
+    if data2 is None:
+        data2 = data1
+        
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
   
@@ -47,7 +50,7 @@ def isc(data1, data2):
 
 
 
-def isfc(data1, data2):
+def isfc(data1, data2=None):
     from scipy.spatial.distance import cdist
 
     """Cal functional connectivity between data1 and data2.
@@ -69,9 +72,30 @@ def isfc(data1, data2):
         1. data1 and data2 should both be 2-dimensional.
         2. n_features should be the same in data1 and data2.
     """
-    return 1 - cdist(data1, data2, metric='correlation')
+    if data2 is None:
+        data2 = data1
 
+    corr = np.nan_to_num(1 - cdist(data1, data2, metric='correlation'))
+    return corr
+
+
+def rsm(data):
+    """Cal representaion similarity matrix.
+    
+    Parameters
+    ----------
+        data1: used to calculate functional connectivity, 
+            shape = [n_samples, n_features].
+    Returns
+    -------
+        rsm_value: upper triangle of rsm, without diagonal
+    """   
+    rsm = isfc(data)[np.triu_indices(np.shape(data)[0],k=1)]   
+    return rsm
   
+    
+
+
 def tSNR(data):
     """alculate the temporal signal-to-noise ratio (tSNR) for each vertex
     Parameters
@@ -301,6 +325,13 @@ def local_extreme(x,condition):
     return extreme_loc
 
 
+def rank(data,axis=0):
+    order = data.argsort(axis)
+    ranks = order.argsort(axis)
+    
+    return ranks
+    
+    
 def roiing_volume(roi_annot,volume_ts,roix_regressed):
 #    not_roi = np.where(roi_annot == 0)
 #    volume_ts[not_roi[0],not_roi[1],not_roi[2],:] = 0
@@ -343,3 +374,109 @@ def roiing_volume_roi_mean(roi_annot,volume_ts):
         roi_ts[i-1,0,0,:]= roi_i.mean(0)
     
     return roi_ts
+
+
+
+def get_n_ring_neighbor(faces, n=1, ordinal=False, mask=None):
+    """ copy from freeroi by Xiayu CHEN
+    get n ring neighbor from faces array
+    Parameters
+    ----------
+    faces : numpy array
+        the array of shape [n_triangles, 3]
+    n : integer
+        specify which ring should be got
+    ordinal : bool
+        True: get the n_th ring neighbor
+        False: get the n ring neighbor
+    mask : 1-D numpy array
+        specify a area where the ROI is
+        non-ROI element's value is zero
+    Returns
+    -------
+    lists
+        each index of the list represents a vertex number
+        each element is a set which includes neighbors of corresponding vertex
+    """
+
+    from scipy import sparse
+    
+    def mesh_edges(faces):
+        """
+        Returns sparse matrix with edges as an adjacency matrix
+        Parameters
+        ----------
+        faces : array of shape [n_triangles x 3]
+            The mesh faces
+        Returns
+        -------
+        edges : sparse matrix
+            The adjacency matrix
+        """
+        npoints = np.max(faces) + 1
+        nfaces = len(faces)
+        a, b, c = faces.T
+        edges = sparse.coo_matrix((np.ones(nfaces), (a, b)),
+                                  shape=(npoints, npoints))
+        edges = edges + sparse.coo_matrix((np.ones(nfaces), (b, c)),
+                                          shape=(npoints, npoints))
+        edges = edges + sparse.coo_matrix((np.ones(nfaces), (c, a)),
+                                          shape=(npoints, npoints))
+        edges = edges + edges.T
+        edges = edges.tocoo()
+        return edges
+    
+    
+
+    n_vtx = np.max(faces) + 1  # get the number of vertices
+    if mask is not None and np.nonzero(mask)[0].shape[0] == n_vtx:
+        # In this case, the mask covers all vertices and is equal to have no mask (None).
+        # So the program reset it as a None that it will save the computational cost.
+        mask = None
+
+    # find 1_ring neighbors' id for each vertex
+    coo_w = mesh_edges(faces)
+    csr_w = coo_w.tocsr()
+    if mask is None:
+        vtx_iter = range(n_vtx)
+        n_ring_neighbors = [csr_w.indices[csr_w.indptr[i]:csr_w.indptr[i+1]] for i in vtx_iter]
+        n_ring_neighbors = [set(i) for i in n_ring_neighbors]
+    else:
+        mask_id = np.nonzero(mask)[0]
+        vtx_iter = mask_id
+        n_ring_neighbors = [set(csr_w.indices[csr_w.indptr[i]:csr_w.indptr[i+1]])
+                            if mask[i] != 0 else set() for i in range(n_vtx)]
+        for vtx in vtx_iter:
+            neighbor_set = n_ring_neighbors[vtx]
+            neighbor_iter = list(neighbor_set)
+            for i in neighbor_iter:
+                if mask[i] == 0:
+                    neighbor_set.discard(i)
+
+    if n > 1:
+        # find n_ring neighbors
+        one_ring_neighbors = [i.copy() for i in n_ring_neighbors]
+        n_th_ring_neighbors = [i.copy() for i in n_ring_neighbors]
+        # if n>1, go to get more neighbors
+        for i in range(n-1):
+            for neighbor_set in n_th_ring_neighbors:
+                neighbor_set_tmp = neighbor_set.copy()
+                for v_id in neighbor_set_tmp:
+                    neighbor_set.update(one_ring_neighbors[v_id])
+
+            if i == 0:
+                for v_id in vtx_iter:
+                    n_th_ring_neighbors[v_id].remove(v_id)
+
+            for v_id in vtx_iter:
+                n_th_ring_neighbors[v_id] -= n_ring_neighbors[v_id]  # get the (i+2)_th ring neighbors
+                n_ring_neighbors[v_id] |= n_th_ring_neighbors[v_id]  # get the (i+2) ring neighbors
+    elif n == 1:
+        n_th_ring_neighbors = n_ring_neighbors
+    else:
+        raise RuntimeError("The number of rings should be equal or greater than 1!")
+
+    if ordinal:
+        return n_th_ring_neighbors
+    else:
+        return n_ring_neighbors

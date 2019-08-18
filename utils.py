@@ -27,12 +27,18 @@ def write_list2txt(txt_path, data, delimiter=None):
             f.write('{0}{1}'.format(item,delimiter))
 
 
-def list_dir(dir_path='*',subdir_only=False):
-    if subdir_only == True:
-        fs = [f for f in glob.glob(dir_path) if not '.' in f]        
+def list_dir(dir_path=None,subdir_only=False):
+    if dir_path is not None:
+        if subdir_only == True:
+            fs = [f for f in glob.glob(dir_path) if not '.' in f]        
+        else:
+            fs = glob.glob(dir_path)
     else:
-        fs = glob.glob(dir_path)
-          
+        if subdir_only == True:
+            fs = [f.name for f in os.scandir(dir_path) if f.is_dir() ]           
+        else:
+            fs = [f.name for f in os.scandir(dir_path)]
+           
     fs.sort()
     return fs
     
