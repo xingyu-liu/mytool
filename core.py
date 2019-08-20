@@ -79,7 +79,7 @@ def isfc(data1, data2=None):
     return corr
 
 
-def rsm(data):
+def rdm(data):
     """Cal representaion similarity matrix.
     
     Parameters
@@ -90,8 +90,8 @@ def rsm(data):
     -------
         rsm_value: upper triangle of rsm, without diagonal
     """   
-    rsm = isfc(data)[np.triu_indices(np.shape(data)[0],k=1)]   
-    return rsm
+    rdm = 1 - isfc(data)[np.triu_indices(np.shape(data)[0],k=1)]   
+    return rdm
   
     
 
@@ -148,16 +148,6 @@ def perct_agreement(x,y):
     length = np.asarray(x).shape[0]
     return agr_length/length
 
-
-def hist2grp(data, labels, fig_size, title, bin_amount, density):
-    
-    plt.figure(figsize=(fig_size[0],fig_size[1]))
-    colors = ['red', 'blue']
-    plt.hist(data, bins=bin_amount, density=density, color=colors, 
-             label=labels)
-    plt.legend(prop={'size': 10})
-    plt.title(title)
-#    plt.show()
     
     
 def within_between(data, start_point_array):
@@ -205,6 +195,29 @@ def corr_matrix2graph(corr_matrix):
     return G
 
 
+def rearrange_mat(x,rearrange_index):
+    
+    x_new = x[rearrange_index,:]
+    x_new = x_new[:, rearrange_index]
+    
+    return x_new
+    
+    
+def dendo_community(x):
+    import community 
+    
+    G = corr_matrix2graph(x)    
+    dendo = community.generate_dendrogram(G)
+    dendo_community = np.array([dendo[0][key] for key in dendo[0].keys()])
+    sort_index = np.argsort(dendo_community)
+    
+    sorted_x = rearrange_mat(x,sort_index)
+    sorted_x = x[sort_index,:]
+    sorted_x = sorted_x[:, sort_index]
+    
+    return sorted_x, sort_index
+
+
 def cluster(X, last_merge_number, cluster_number):
     from time import time
     from scipy.cluster import hierarchy
@@ -234,18 +247,6 @@ def cluster(X, last_merge_number, cluster_number):
     
     return X_cluster
 
-    
-def dendo_community(x):
-    import community 
-    
-    G = corr_matrix2graph(x)    
-    dendo = community.generate_dendrogram(G)
-    dendo_community = np.array([dendo[0][key] for key in dendo[0].keys()])
-    sort_index = np.argsort(dendo_community)
-    sorted_x = x[sort_index,:]
-    sorted_x = sorted_x[:, sort_index]
-    
-    return sorted_x, sort_index
 
 
 def fdr_correction(p_value):

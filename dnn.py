@@ -143,7 +143,7 @@ def glm_model(y,x,target_ft=None):
 
 
 # plot
-def plot_chn_scatter(x,y,ref=None,cat_cls=None,label=None):
+def plot_chn_scatter(x,y,ref=None,cat_cls=None):
     
     """ 
     Parameters
@@ -163,11 +163,11 @@ def plot_chn_scatter(x,y,ref=None,cat_cls=None,label=None):
             color = ['cornflowerblue','lightcoral','limegreen',
                      'gray', 'hotpink', 'blueviolet','gold']
             for cat in range(y.shape[0]):
-                ax.scatter(x, y[cat,:], s=8, c=color[cat],label=label[cat])           
+                ax.scatter(x, y[cat,:], s=8, c=color[cat])           
         else:
             color = np.random.random([3,y.shape[0]])
             for cat in range(y.shape[0]):
-                ax.scatter(x, y[cat,:], s=8, c=color[:,cat],label=label[cat])
+                ax.scatter(x, y[cat,:], s=8, c=color[:,cat])
 
     elif ref != None and cat_cls == None:
         color = np.random.random([3,y.shape[0]])

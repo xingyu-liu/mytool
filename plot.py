@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
+
 def rdm(data, label=None, fig_size=None, title=None, 
         delete_diag=None, show_value=None, colormap=None):
     
@@ -48,6 +49,30 @@ def rdm(data, label=None, fig_size=None, title=None,
                          ha="center", va="center", color="w")
     fig.tight_layout()
     plt.show()
+
+
+def sub_im(x,nrows,ncols,vmin=None,vmax=None,title=None):
+    """
+    
+    Parameters
+    ----------
+        x: shape: n_samples * image_array
+    """
+    
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, 
+                            subplot_kw={'xticks': [], 'yticks': []})
+    for ax, i in zip(axs.flat[:x.shape[0]],range(x.shape[0])):
+        if vmin is None:
+            vmin = x[i].min()
+        if vmax is None:
+            vmin = x[i].max()
+        ax.imshow(x[i], vmin=vmin,vmax=vmax)
+        if title is not None:
+            ax.set_title(str(title[i]))
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 def scatter_bar(matrix , x_bar=None, y_bar=None): 
