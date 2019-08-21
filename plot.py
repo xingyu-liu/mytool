@@ -8,6 +8,7 @@ This is a temporary script file.
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import seaborn as sns
 
 
 def rdm(data, label=None, fig_size=None, title=None, 
@@ -126,14 +127,14 @@ def scatter_bar(matrix , x_bar=None, y_bar=None):
     plt.show()
     
 
-def gradient_color_lines(data,x=None,label=None,ref=None,
+def gradient_color_lines(data,x=None,linestyle='-',label=None,ref=None,
                          coloarmap='viridis',marker='o',markersize=3):
 
     """
     
     Parameters
     ----------
-        data: list of 2-d array, or 1-d array if x is provided
+        data: list of array-like x and y, only y if x is provided
     """
     fig, ax = plt.subplots()
     count = 0 
@@ -143,19 +144,19 @@ def gradient_color_lines(data,x=None,label=None,ref=None,
 
     if x is None:
         for series in data:
-            ax.plot(series[0],series[1], c=color[count], 
+            ax.plot(series[0],series[1],linestyle=linestyle,c=color[count], 
                      marker=marker, markersize=markersize)  # markerfacecolor='none'
             count += 1
         if ref is not None:
-            ax.plot(data[ref][0],data[ref][1],c='tab:red',
+            ax.plot(data[ref][0],data[ref][1],linestyle=linestyle,c='tab:red',
                     marker=marker, markersize=markersize)
     else:
         for series in data:
-            ax.plot(x,series, c=color[count], 
+            ax.plot(x,series,linestyle=linestyle,c=color[count], 
                     marker=marker, markersize=markersize) 
             count += 1  
         if ref is not None:
-            ax.plot(x, data[ref],c='tab:red',
+            ax.plot(x, data[ref],linestyle=linestyle,c='tab:red',
                     marker=marker, markersize=markersize)
             
     if label is not None:
@@ -164,8 +165,8 @@ def gradient_color_lines(data,x=None,label=None,ref=None,
     plt.show()
 
 
-def gradient_color_hist(data,bin_num,show_range=None,weights=None,
-                        label=None,coloarmap='viridis'):
+def gradient_color_hist(data,bin_num,fit=False,show_range=None,weights=None,
+                        label=None,coloarmap='viridis',histtype='bar'):
 
     """
     
@@ -175,7 +176,7 @@ def gradient_color_hist(data,bin_num,show_range=None,weights=None,
         weights : the same shape with data or str 'percentage'
     """
 
-    plt.figure()
+    fig, ax = plt.subplots()
     cmap = plt.cm.get_cmap(coloarmap)
     color_norm = plt.Normalize(0,len(data))
     color = cmap(color_norm(range(len(data))))
@@ -184,8 +185,12 @@ def gradient_color_hist(data,bin_num,show_range=None,weights=None,
         weights = [np.ones(len(data[i])) / len(data[i]) for i 
                    in range(len(data))]
         
-    plt.hist(data,color=color,bins=bin_num,range=show_range,
-             weights=weights,label=label)
+    if fit != True:
+        ax.hist(data,color=color,bins=bin_num,range=show_range,
+                weights=weights,label=label,histtype=histtype)
+    else:
+        for series in data:
+            sns.distplot(series,ax=ax,rug=1,hist=0,bins=bin_num)        
    
     plt.legend()
     plt.show()

@@ -19,7 +19,7 @@ class Dnn_act:
     ---------
         
         data: array_like, 
-            shape = [n_stim,n_chn,n_unit_in_row,n _unit_in_column]
+            shape = [n_stim,n_chn,n_unit_in_row,n_unit_in_column]
     
     """
     
@@ -34,11 +34,15 @@ class Dnn_act:
         self.stim_per_cat = stim_per_cat
         self.cat_num = int(self.stim_num / self.stim_per_cat)
         self.chn_num = np.shape(self.data)[1]
+        self.relued = False
+       
         
-    def chn_act(self, top_n=5, relu=False, replace=False):
-        
-        if relu == True:
-            self.data[self.data<0] = 0       
+    def relu(self):    
+        self.data[self.data<0] = 0  
+        self.relued = True
+    
+    
+    def chn_act(self, top_n=5, replace=False):        
         unit_max_act = np.sort(self.data,-1)[:,:,-1*top_n:]       
         if replace == True:
             self.data = unit_max_act.mean(-1)
@@ -50,9 +54,7 @@ class Dnn_act:
         cur_shape = np.shape(self.data)
         new_shape = np.r_[self.cat_num,self.stim_per_cat,cur_shape[1:]]
         cat_data = self.data.reshape(new_shape)
-        cat_mean = cat_data.mean(1)
-        cat_std = cat_data.std(1)
-        return cat_mean, cat_std
+        return cat_data.mean(1)
 
 
 class Chn_score:
@@ -143,50 +145,48 @@ def glm_model(y,x,target_ft=None):
 
 
 # plot
-def plot_chn_scatter(x,y,ref=None,cat_cls=None):
+def plot_chn_cat(data,ref=None,line_cls=None,
+                 linestyle='-',markersize=1,refmarkersize=10):
     
     """ 
     Parameters
     ---------
         
-        x: channel index, shape = n_chn
-        y: shape = [n_cat,n_chn]
-        ref: highlight one specific cat
-        cat_cls: summary categories into higher level class
+        data: shape = [n_point,n_line]
+        ref: highlight one line,type=int
+        cat_cls: summary line into higher level class
     
     """   
     
     fig, ax = plt.subplots()
     
+    color = ['cornflowerblue','lightcoral','limegreen',
+             'gray', 'hotpink', 'blueviolet','gold']
+    
     if ref == None:
-        if y.shape[0] <= 7:
-            color = ['cornflowerblue','lightcoral','limegreen',
-                     'gray', 'hotpink', 'blueviolet','gold']
-            for cat in range(y.shape[0]):
-                ax.scatter(x, y[cat,:], s=8, c=color[cat])           
-        else:
-            color = np.random.random([3,y.shape[0]])
-            for cat in range(y.shape[0]):
-                ax.scatter(x, y[cat,:], s=8, c=color[:,cat])
+        im_data = data
+    else:
+        im_data = np.delete(data, ref,-1)
+    
+    if line_cls == None:
+        if im_data.shape[-1] <= 7:
 
-    elif ref != None and cat_cls == None:
-        color = np.random.random([3,y.shape[0]])
-        other_cat = np.delete(np.arange(y.shape[0]), ref)
-        for cat in other_cat:
-            ax.scatter(x, y[cat,:], s=8, c=color[:,cat])
-        ax.scatter(x, y[ref,:], marker='o', s=30, c='', edgecolors='tab:red')
-    elif ref != None and cat_cls != None:
-        if len(cat_cls) <= 7:
-            color = ['cornflowerblue','lightcoral','limegreen',
-                     'gray', 'hotpink', 'blueviolet','gold']
+            ax.set_color_cycle(color)
+            ax.plot(im_data,linestyle=linestyle,marker='o',ms=markersize)        
         else:
+            ax.plot(im_data,linestyle=linestyle,marker='o',ms=markersize)
+    else:
+        if len(line_cls) > 7:
             print('no more than 7 cat_cls')
-        cat_cls_count = 0
-        for cat_clsi in cat_cls:
-            for cat in cat_clsi:
-                ax.scatter(x, y[cat,:], s=8, c=color[cat_cls_count])
-            cat_cls_count += 1
-        ax.scatter(x, y[ref,:], marker='o', s=30, c='', edgecolors='tab:red')
+        line_cls_count = 0
+        for line in line_cls:
+            ax.plot(im_data[:,line],c=color[line_cls_count],
+                    linestyle=linestyle,marker='o',ms=markersize)              
+            line_cls_count += 1
+
+    if ref != None:
+        ax.plot(data[:,ref],linestyle=linestyle,marker='o',ms=refmarkersize,
+                markeredgecolor='tab:red',markerfacecolor='None') 
     
     ax.legend()
     plt.show()
