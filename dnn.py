@@ -9,6 +9,7 @@ This is a temporary script file.
 import numpy as np
 import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 
@@ -28,8 +29,9 @@ class Dnn_act:
         if data.ndim == 2 or data.ndim == 3:
             self.data = data
         elif data.ndim ==4:
-            self.data = data.reshape([data.shape[0],data.shape[1],
-                                      data.shape[2]*data.shape[3]])
+            self.data = data.reshape([data.shape[0],data.shape[1],-1])
+        else:
+            print('the shape of data has to be 2/3/4-d')
         self.stim_num = np.shape(self.data)[0]
         self.stim_per_cat = stim_per_cat
         self.cat_num = int(self.stim_num / self.stim_per_cat)
@@ -145,7 +147,7 @@ def glm_model(y,x,target_ft=None):
 
 
 # plot
-def plot_chn_cat(data,ref=None,line_cls=None,
+def plot_chn_cat(data,ref=None,line_cls=None,label = None,
                  linestyle='-',markersize=1,refmarkersize=10):
     
     """ 
@@ -160,8 +162,8 @@ def plot_chn_cat(data,ref=None,line_cls=None,
     
     fig, ax = plt.subplots()
     
-    color = ['cornflowerblue','lightcoral','limegreen',
-             'gray', 'hotpink', 'blueviolet','gold']
+    color = ['limegreen','orange','cornflowerblue','silver','lightcoral',
+              'hotpink', 'blueviolet','gold']
     
     if ref == None:
         im_data = data
@@ -169,24 +171,116 @@ def plot_chn_cat(data,ref=None,line_cls=None,
         im_data = np.delete(data, ref,-1)
     
     if line_cls == None:
-        if im_data.shape[-1] <= 7:
+        if im_data.shape[-1] <= 8:
 
             ax.set_color_cycle(color)
             ax.plot(im_data,linestyle=linestyle,marker='o',ms=markersize)        
         else:
             ax.plot(im_data,linestyle=linestyle,marker='o',ms=markersize)
     else:
-        if len(line_cls) > 7:
+        if len(line_cls) > 8:
             print('no more than 7 cat_cls')
-        line_cls_count = 0
-        for line in line_cls:
-            ax.plot(im_data[:,line],c=color[line_cls_count],
+
+        for i, line in enumerate(line_cls):
+            ax.plot(im_data[:,line],c=color[i],
                     linestyle=linestyle,marker='o',ms=markersize)              
-            line_cls_count += 1
 
     if ref != None:
         ax.plot(data[:,ref],linestyle=linestyle,marker='o',ms=refmarkersize,
                 markeredgecolor='tab:red',markerfacecolor='None') 
     
-    ax.legend()
+    if label is not None:
+        ax.legend(label)
     plt.show()
+
+
+def plot_lines_layers(data,x=None,linestyle='-',label=None,
+                      coloarmap='viridis',marker='o',markersize=3):
+    """
+    
+    Parameters
+    ----------
+        data: list of array-like x and y
+            len(data) = 8, first 5 is conv layer, last 3 is fc layer
+    """
+    fig, ax = plt.subplots()
+    
+    if len(data) <= 5:
+        sns.set_palette(coloarmap,n_colors=len(data))
+
+        for series in data:
+            if x is None:
+                ax.plot(series[0],series[1],linestyle=linestyle, 
+                         marker=marker, markersize=markersize)  
+            else:
+                ax.plot(x,series,linestyle=linestyle, 
+                        marker=marker, markersize=markersize)  
+            
+            
+    elif len(data) == 8:    
+        cmap = plt.cm.get_cmap('Blues')
+        color_norm = plt.Normalize(0,8)
+        color_conv = cmap(color_norm(range(8)))[-5:,:]
+        
+        cmap = plt.cm.get_cmap('Oranges')
+        color_norm = plt.Normalize(0,4)
+        color_fc = cmap(color_norm(range(4)))[-3:,:]
+        
+        color = np.r_[color_conv,color_fc]
+        
+        for i, series in enumerate(data):
+            if x is None:
+                ax.plot(series[0],series[1],color=color[i],linestyle=linestyle,
+                        marker=marker, markersize=markersize) 
+            else:
+                ax.plot(x,series,color=color[i],linestyle=linestyle,
+                        marker=marker, markersize=markersize)                 
+    if label is not None:
+        ax.legend(label)
+    plt.show()
+    
+    
+def plot_hist_layers(data,bin_num=20,fit=False,show_range=None,density=False,
+                        label=None,coloarmap='viridis',histtype='bar',
+                        rug=True,hist=False):
+    """
+    
+    Parameters
+    ----------
+        data: list of 1-d data 
+        weights : the same shape with data or str 'percentage'
+    """
+    fig, ax = plt.subplots()
+    
+    if len(data) <= 5:
+        sns.set_palette(coloarmap,n_colors=len(data))
+        if fit != True:        
+            ax.hist(data,bins=bin_num,range=show_range,
+                    density=density,histtype=histtype)
+        else:
+            for series in data:
+                sns.distplot(series,ax=ax,rug=rug,hist=hist,bins=bin_num) 
+
+    elif len(data) == 8:    
+        cmap = plt.cm.get_cmap('Blues')
+        color_norm = plt.Normalize(0,8)
+        color_conv = cmap(color_norm(range(8)))[-5:,:]
+        
+        cmap = plt.cm.get_cmap('Oranges')
+        color_norm = plt.Normalize(0,4)
+        color_fc = cmap(color_norm(range(4)))[-3:,:]
+        
+        color = np.r_[color_conv,color_fc]
+        
+        if fit != True:        
+            ax.hist(data,bins=bin_num,range=show_range,color=color,
+                    density=density,histtype=histtype)
+        else:
+            for i, series in enumerate(data):
+                sns.distplot(series,ax=ax,color=list(color[i]),
+                             rug=rug,hist=hist,bins=bin_num)  
+                
+    if label is not None:
+        ax.legend(label)
+    plt.show()
+    

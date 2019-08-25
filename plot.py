@@ -11,7 +11,7 @@ import matplotlib
 import seaborn as sns
 
 
-def rdm(data, label=None, fig_size=None, title=None, 
+def rdm(data, label=None, fig_size=None, title=None, vmin=None,vmax=None,
         delete_diag=None, show_value=None, colormap=None):
     
 
@@ -30,9 +30,12 @@ def rdm(data, label=None, fig_size=None, title=None,
         cmap = plt.cm.get_cmap(colormap)
     else:
         cmap = plt.cm.coolwarm
-    
-    im = plt.imshow(data,cmap=cmap)
-    
+        
+    if vmin is None:
+        vmin = data.min()
+    if vmax is None:
+        vmin = data.max()
+    im = plt.imshow(data,cmap=cmap,vmin=vmin,vmax=vmax)
     plt.colorbar(im, fraction=0.02)
 
     
@@ -52,7 +55,7 @@ def rdm(data, label=None, fig_size=None, title=None,
     plt.show()
 
 
-def sub_im(x,nrows,ncols,vmin=None,vmax=None,title=None):
+def sub_im(x,nrows,ncols,vmin=None,vmax=None,title=None,colormap=None):
     """
     
     Parameters
@@ -62,18 +65,22 @@ def sub_im(x,nrows,ncols,vmin=None,vmax=None,title=None):
     
     fig, axs = plt.subplots(nrows=nrows, ncols=ncols, 
                             subplot_kw={'xticks': [], 'yticks': []})
+    
+    if colormap is not None:
+        cmap = plt.cm.get_cmap(colormap)
+    else:
+        cmap = plt.cm.coolwarm
+        
     for ax, i in zip(axs.flat[:x.shape[0]],range(x.shape[0])):
         if vmin is None:
             vmin = x[i].min()
         if vmax is None:
             vmin = x[i].max()
-        ax.imshow(x[i], vmin=vmin,vmax=vmax)
+        ax.imshow(x[i],cmap=cmap,vmin=vmin,vmax=vmax)
         if title is not None:
             ax.set_title(str(title[i]))
     plt.tight_layout()
     plt.show()
-
-
 
 
 def scatter_bar(matrix , x_bar=None, y_bar=None): 
@@ -137,24 +144,24 @@ def gradient_color_lines(data,x=None,linestyle='-',label=None,ref=None,
         data: list of array-like x and y, only y if x is provided
     """
     fig, ax = plt.subplots()
-    count = 0 
-    cmap = plt.cm.get_cmap(coloarmap)
-    color_norm = plt.Normalize(0,len(data))
-    color = cmap(color_norm(range(len(data))))
+    
+#    cmap = plt.cm.get_cmap(coloarmap)
+#    color_norm = plt.Normalize(0,len(data))
+#    color = cmap(color_norm(range(len(data))))
+    
+    sns.set_palette(coloarmap,n_colors=len(data))
 
     if x is None:
         for series in data:
-            ax.plot(series[0],series[1],linestyle=linestyle,c=color[count], 
+            ax.plot(series[0],series[1],linestyle=linestyle, 
                      marker=marker, markersize=markersize)  # markerfacecolor='none'
-            count += 1
         if ref is not None:
             ax.plot(data[ref][0],data[ref][1],linestyle=linestyle,c='tab:red',
                     marker=marker, markersize=markersize)
     else:
         for series in data:
-            ax.plot(x,series,linestyle=linestyle,c=color[count], 
+            ax.plot(x,series,linestyle=linestyle, 
                     marker=marker, markersize=markersize) 
-            count += 1  
         if ref is not None:
             ax.plot(x, data[ref],linestyle=linestyle,c='tab:red',
                     marker=marker, markersize=markersize)
@@ -165,8 +172,9 @@ def gradient_color_lines(data,x=None,linestyle='-',label=None,ref=None,
     plt.show()
 
 
-def gradient_color_hist(data,bin_num,fit=False,show_range=None,weights=None,
-                        label=None,coloarmap='viridis',histtype='bar'):
+def gradient_color_hist(data,bin_num=10,fit=False,show_range=None,density=False,
+                        label=None,coloarmap='viridis',histtype='bar',
+                        rug=True,hist=False):
 
     """
     
@@ -177,21 +185,17 @@ def gradient_color_hist(data,bin_num,fit=False,show_range=None,weights=None,
     """
 
     fig, ax = plt.subplots()
-    cmap = plt.cm.get_cmap(coloarmap)
-    color_norm = plt.Normalize(0,len(data))
-    color = cmap(color_norm(range(len(data))))
-    
-    if weights == 'percentage':       
-        weights = [np.ones(len(data[i])) / len(data[i]) for i 
-                   in range(len(data))]
-        
-    if fit != True:
-        ax.hist(data,color=color,bins=bin_num,range=show_range,
-                weights=weights,label=label,histtype=histtype)
+    sns.set_palette(coloarmap,n_colors=len(data))
+
+    if fit != True:        
+        ax.hist(data,bins=bin_num,range=show_range,
+                density=density,histtype=histtype)
     else:
         for series in data:
-            sns.distplot(series,ax=ax,rug=1,hist=0,bins=bin_num)        
-   
-    plt.legend()
+            sns.distplot(series,ax=ax,
+                         rug=rug,hist=hist,bins=bin_num) 
+            
+    if label is not None:
+        ax.legend(label)
     plt.show()
         
