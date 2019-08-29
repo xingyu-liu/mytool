@@ -195,7 +195,7 @@ def plot_chn_cat(data,ref=None,line_cls=None,label = None,
 
 
 def plot_lines_layers(data,x=None,linestyle='-',label=None,
-                      coloarmap='viridis',marker='o',markersize=3):
+                      coloarmap='rainbow',marker='o',markersize=3):
     """
     
     Parameters
@@ -219,8 +219,8 @@ def plot_lines_layers(data,x=None,linestyle='-',label=None,
             
     elif len(data) == 8:    
         cmap = plt.cm.get_cmap('Blues')
-        color_norm = plt.Normalize(0,8)
-        color_conv = cmap(color_norm(range(8)))[-5:,:]
+        color_norm = plt.Normalize(0,7)
+        color_conv = cmap(color_norm(range(7)))[-5:,:]
         
         cmap = plt.cm.get_cmap('Oranges')
         color_norm = plt.Normalize(0,4)
@@ -241,7 +241,7 @@ def plot_lines_layers(data,x=None,linestyle='-',label=None,
     
     
 def plot_hist_layers(data,bin_num=20,fit=False,show_range=None,density=False,
-                        label=None,coloarmap='viridis',histtype='bar',
+                        label=None,coloarmap='rainbow',histtype='bar',
                         rug=True,hist=False):
     """
     
@@ -263,8 +263,8 @@ def plot_hist_layers(data,bin_num=20,fit=False,show_range=None,density=False,
 
     elif len(data) == 8:    
         cmap = plt.cm.get_cmap('Blues')
-        color_norm = plt.Normalize(0,8)
-        color_conv = cmap(color_norm(range(8)))[-5:,:]
+        color_norm = plt.Normalize(0,7)
+        color_conv = cmap(color_norm(range(7)))[-5:,:]
         
         cmap = plt.cm.get_cmap('Oranges')
         color_norm = plt.Normalize(0,4)

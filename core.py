@@ -138,6 +138,22 @@ def dice(x,y):
     return dice_coef
 
 
+
+def sparseness(x):
+    """
+    parameters:
+    ----------
+        x: [n_stim], firing rate(activation) of one neuron to each stimulus
+    """    
+    
+    n_stim = np.shape(x)
+    sparse_v = ((x.sum()/n_stim)**2) / (
+            np.asarray([*map(lambda x: x**2, x)]).sum()/n_stim)
+    
+    return sparse_v
+    
+    
+
 def perct_agreement(x,y):
     """
     parameters:

@@ -34,7 +34,7 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None,vmax=None,
     if vmin is None:
         vmin = data.min()
     if vmax is None:
-        vmin = data.max()
+        vmax = data.max()
     im = plt.imshow(data,cmap=cmap,vmin=vmin,vmax=vmax)
     plt.colorbar(im, fraction=0.02)
 
@@ -75,10 +75,11 @@ def sub_im(x,nrows,ncols,vmin=None,vmax=None,title=None,colormap=None):
         if vmin is None:
             vmin = x[i].min()
         if vmax is None:
-            vmin = x[i].max()
-        ax.imshow(x[i],cmap=cmap,vmin=vmin,vmax=vmax)
+            vmax = x[i].max()
+        im = ax.imshow(x[i],cmap=cmap,vmin=vmin,vmax=vmax)
         if title is not None:
             ax.set_title(str(title[i]))
+#        plt.colorbar(im, ax=ax, fraction=0.02)
     plt.tight_layout()
     plt.show()
 
