@@ -7,7 +7,7 @@ This is a temporary script file.
 """
 
 import numpy as np
-import statsmodels.formula.api as smf
+# import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -231,7 +231,7 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
 
 
 def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
-                     density=False, label=None, coloarmap='rainbow',
+                     density=False, label=None, colormap='rainbow',
                      histtype='bar', rug=True, hist=False):
     """
 
@@ -243,7 +243,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
     fig, ax = plt.subplots()
 
     if len(data) <= 5:
-        sns.set_palette(coloarmap, n_colors=len(data))
+        sns.set_palette(colormap, n_colors=len(data))
         if fit is not True:
             ax.hist(data, bins=bin_num, range=show_range,
                     density=density, histtype=histtype)
@@ -251,14 +251,14 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
             for series in data:
                 sns.distplot(series, ax=ax, rug=rug, hist=hist, bins=bin_num)
 
-    elif len(data) == 8:
+    elif len(data) == 7:
         cmap = plt.cm.get_cmap('Blues')
         color_norm = plt.Normalize(0, 7)
         color_conv = cmap(color_norm(range(7)))[-5:, :]
 
         cmap = plt.cm.get_cmap('Oranges')
         color_norm = plt.Normalize(0, 4)
-        color_fc = cmap(color_norm(range(4)))[-3:, :]
+        color_fc = cmap(color_norm(range(4)))[-3:-1, :]
 
         color = np.r_[color_conv, color_fc]
 
@@ -269,6 +269,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
             for i, series in enumerate(data):
                 sns.distplot(series, ax=ax, color=list(color[i]),
                              rug=rug, hist=hist, bins=bin_num)
+    ax.invert_xaxis()
 
     if label is not None:
         ax.legend(label)

@@ -21,10 +21,15 @@ def readtxt(txt_path, delimiter=None, exclude_first_line=0):
     return x
 
 
-def write_list2txt(txt_path, data, delimiter=None):
+def write_list2txt(txt_path, data, delimiter=','):
     with open(txt_path, 'wt') as f:
         for item in data:
-            f.write('{0}{1}'.format(item, delimiter))
+            for i, content in enumerate(item):
+                if i == len(item)-1:
+                    f.write(content)
+                else:
+                    f.write('{0}{1}'.format(content, delimiter))
+            f.write('\n')
 
 
 def list_dir(dir_path=None, subdir_only=False):
