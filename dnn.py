@@ -206,14 +206,14 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
             else:
                 ax.plot(x, series, linestyle=linestyle,
                         marker=marker, markersize=markersize)
-    elif len(data) == 8:
+    elif len(data) == 7:
         cmap = plt.cm.get_cmap('Blues')
         color_norm = plt.Normalize(0, 7)
         color_conv = cmap(color_norm(range(7)))[-5:, :]
 
         cmap = plt.cm.get_cmap('Oranges')
         color_norm = plt.Normalize(0, 4)
-        color_fc = cmap(color_norm(range(4)))[-3:, :]
+        color_fc = cmap(color_norm(range(4)))[-3:-1, :]
 
         color = np.r_[color_conv, color_fc]
 
@@ -225,6 +225,9 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
             else:
                 ax.plot(x, series, color=color[i], linestyle=linestyle,
                         marker=marker, markersize=markersize)
+    
+    ax.invert_xaxis()
+    
     if label is not None:
         ax.legend(label)
     plt.show()
@@ -269,7 +272,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
             for i, series in enumerate(data):
                 sns.distplot(series, ax=ax, color=list(color[i]),
                              rug=rug, hist=hist, bins=bin_num)
-    ax.invert_xaxis()
+#    ax.invert_xaxis()
 
     if label is not None:
         ax.legend(label)

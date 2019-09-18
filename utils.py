@@ -8,16 +8,18 @@ import os
 import glob
 
 
-def readtxt(txt_path, delimiter=None, exclude_first_line=0):
+def readtxt(txt_path, delimiter=None, exclude_first_n_line=0):
     x = []
-    with open(txt_path, 'r') as f:
-        for line in f.readlines()[exclude_first_line:]:
+    with open(txt_path, 'r') as f:        
+        lines = f.read().splitlines()
+        while '' in lines:
+            lines.remove('')
+        for line in lines[exclude_first_n_line:]:
             if delimiter:
                 split_line = line.strip('\n').split(delimiter)
                 x.append(split_line)
             else:
                 x.append(line)
-
     return x
 
 

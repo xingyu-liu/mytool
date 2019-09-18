@@ -52,13 +52,13 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
     plt.show()
 
 
-def sub_im(x, nrows, ncols, vmin=None, vmax=None,
+def sub_plot(x, nrows, ncols, plot_type='im', vmin=None, vmax=None,
            title=None, colormap=None):
     """
 
     Parameters
     ----------
-        x: shape: n_samples * image_array
+        x[list]: list of image_array
     """
 
     fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
@@ -69,12 +69,23 @@ def sub_im(x, nrows, ncols, vmin=None, vmax=None,
     else:
         cmap = plt.cm.coolwarm
 
-    for ax, i in zip(axs.flat[:x.shape[0]], range(x.shape[0])):
+    for ax, i in zip(axs.flat[:len(x)], range(len(x))):
         if vmin is None:
             vmin = x[i].min()
         if vmax is None:
             vmax = x[i].max()
-        ax.imshow(x[i], cmap=cmap, vmin=vmin, vmax=vmax)
+        
+        if plot_type == 'im':
+            ax.imshow(x[i], cmap=cmap, vmin=vmin, vmax=vmax)
+        elif plot_type == 'plot':
+            ax.plot(x[i], vmin=vmin, vmax=vmax)
+        elif plot_type == 'hist':
+            ax.hist(x[i], vmin=vmin, vmax=vmax)
+        elif plot_type == 'scatter':
+            ax.scatter(x[i], vmin=vmin, vmax=vmax)
+        elif plot_type == 'semilogy':
+            ax.semilogy(x[i])
+            
         if title is not None:
             ax.set_title(str(title[i]))
 #        plt.colorbar(im, ax=ax, fraction=0.02)
