@@ -272,7 +272,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
             for i, series in enumerate(data):
                 sns.distplot(series, ax=ax, color=list(color[i]),
                              rug=rug, hist=hist, bins=bin_num)
-#    ax.invert_xaxis()
+    ax.invert_xaxis()
 
     if label is not None:
         ax.legend(label)

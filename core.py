@@ -142,7 +142,8 @@ def sparseness(x):
 
     n_stim = np.shape(x)
     # make sure any x > 0
-    x = x + x.min()
+    assert x.min() >= 0, 'x should all be positive'
+    
     sparse_v = ((x.sum()/n_stim)**2) / (
             np.asarray([*map(lambda x: x**2, x)]).sum()/n_stim)
 
