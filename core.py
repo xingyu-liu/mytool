@@ -8,6 +8,7 @@ This is a temporary script file.
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
 
 
 def isc(data1, data2=None):
@@ -133,19 +134,24 @@ def dice(x, y):
     return dice_coef
 
 
-def sparseness(x):
+def sparseness(x, norm=False):
     """
     parameters:
     ----------
-        x: [n_stim], firing rate(activation) of one neuron to each stimulus
+        x: [n_stim, n_cell], firing rate(activation) of each cell 
+            to each stimulus
     """
+    if norm is True:
+        min_max_scaler = MinMaxScaler(feature_range=(0, 1))
+        x = min_max_scaler.fit_transform(x)
+    
+    n_stim = x.shape[0]
 
-    n_stim = np.shape(x)
     # make sure any x > 0
     assert x.min() >= 0, 'x should all be positive'
     
-    sparse_v = ((x.sum()/n_stim)**2) / (
-            np.asarray([*map(lambda x: x**2, x)]).sum()/n_stim)
+    sparse_v = ((x.sum(0)/n_stim)**2) / (
+            np.asarray([*map(lambda x: x**2, x)]).sum(0)/n_stim)
 
     return sparse_v
 
@@ -303,7 +309,7 @@ def cohen_d(pre, post):
     d = np.nan_to_num(d)
 
     return d
-
+   
 
 def residual(X, y):
     from sklearn.linear_model import LinearRegression
@@ -336,9 +342,14 @@ def local_extreme(x, condition):
     return extreme_loc
 
 
-def rank(data, axis=0):
-    order = data.argsort(axis)
-    ranks = order.argsort(axis)
+def rank(data, axis=0, order='descending'):
+    if order == 'ascending':
+        order = data.argsort(axis)
+        ranks = order.argsort(axis)   
+
+    elif order == 'descending':
+        order = (data*-1).argsort(axis)
+        ranks = order.argsort(axis)
 
     return ranks
 
@@ -495,3 +506,14 @@ def get_n_ring_neighbor(faces, n=1, ordinal=False, mask=None):
         return n_th_ring_neighbors
     else:
         return n_ring_neighbors
+
+
+def list_stats(x, method='mean', axis=None):
+    if method == 'mean':
+        return np.array([x[i].mean(axis) for i in range(len(x))])
+    elif method == 'max':
+        return np.array([x[i].max(axis) for i in range(len(x))])
+    elif method == 'min':
+        return np.array([x[i].min(axis) for i in range(len(x))])
+    elif method == 'median':
+        return np.array([np.median(x[i], axis) for i in range(len(x))])

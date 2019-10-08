@@ -43,7 +43,7 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
         plt.yticks(np.arange(np.size(data, 0)), label)
 
     if show_value is not None:
-        valfmt = matplotlib.ticker.StrMethodFormatter('{x:.2f}')
+        valfmt = matplotlib.ticker.StrMethodFormatter('{x:.0f}')
         for i in range(np.size(data, 0)):
             for j in range(np.size(data, 1)):
                 plt.text(j, i, valfmt(data[i, j]),
@@ -82,7 +82,7 @@ def sub_plot(x, nrows, ncols, plot_type='im', vmin=None, vmax=None,
         elif plot_type == 'hist':
             ax.hist(x[i], vmin=vmin, vmax=vmax)
         elif plot_type == 'scatter':
-            ax.scatter(x[i], vmin=vmin, vmax=vmax)
+            ax.scatter(x[i][:, 0], x[i][:, 1], vmin=vmin, vmax=vmax, s=0.01)
         elif plot_type == 'semilogy':
             ax.semilogy(x[i])
             

@@ -187,7 +187,7 @@ def plot_chn_cat(data, ref=None, line_cls=None, label=None,
 
 
 def plot_lines_layers(data, x=None, linestyle='-', label=None,
-                      coloarmap='rainbow', marker='o', markersize=3):
+                      colormap='rainbow', marker='o', markersize=3):
     """
 
     Parameters
@@ -197,8 +197,8 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
     """
     fig, ax = plt.subplots()
 
-    if len(data) <= 5:
-        sns.set_palette(coloarmap, n_colors=len(data))
+    if len(data) <= 6 or len(data) > 7:
+        sns.set_palette(colormap, n_colors=len(data))
         for series in data:
             if x is None:
                 ax.plot(series[0], series[1], linestyle=linestyle,
@@ -226,7 +226,7 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
                 ax.plot(x, series, color=color[i], linestyle=linestyle,
                         marker=marker, markersize=markersize)
     
-    ax.invert_xaxis()
+#    ax.invert_xaxis()
     
     if label is not None:
         ax.legend(label)
@@ -245,7 +245,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
     """
     fig, ax = plt.subplots()
 
-    if len(data) <= 5:
+    if len(data) <= 6 or len(data) > 7:
         sns.set_palette(colormap, n_colors=len(data))
         if fit is not True:
             ax.hist(data, bins=bin_num, range=show_range,
@@ -272,7 +272,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
             for i, series in enumerate(data):
                 sns.distplot(series, ax=ax, color=list(color[i]),
                              rug=rug, hist=hist, bins=bin_num)
-    ax.invert_xaxis()
+#    ax.invert_xaxis()
 
     if label is not None:
         ax.legend(label)
