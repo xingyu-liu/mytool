@@ -195,7 +195,7 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
         data: list of array-like x and y
             len(data) = 8, first 5 is conv layer, last 3 is fc layer
     """
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(4, 3))
 
     if len(data) <= 6 or len(data) > 7:
         sns.set_palette(colormap, n_colors=len(data))
@@ -227,6 +227,12 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
                         marker=marker, markersize=markersize)
     
 #    ax.invert_xaxis()
+
+    ax.spines['top'].set_visible(False) 
+#    ax.spines['bottom'].set_visible(False)
+#    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
     
     if label is not None:
         ax.legend(label)
@@ -243,7 +249,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
         data: list of 1-d data
         weights : the same shape with data or str 'percentage'
     """
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(4, 3))
 
     if len(data) <= 6 or len(data) > 7:
         sns.set_palette(colormap, n_colors=len(data))
@@ -269,10 +275,17 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
             ax.hist(data, bins=bin_num, range=show_range, color=color,
                     density=density, histtype=histtype)
         else:
+            if show_range is not None:
+                ax.set_xlim(show_range[0], show_range[1])
             for i, series in enumerate(data):
                 sns.distplot(series, ax=ax, color=list(color[i]),
                              rug=rug, hist=hist, bins=bin_num)
 #    ax.invert_xaxis()
+
+    ax.spines['top'].set_visible(False) 
+#    ax.spines['bottom'].set_visible(False)
+#    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
     if label is not None:
         ax.legend(label)

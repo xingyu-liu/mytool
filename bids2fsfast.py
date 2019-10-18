@@ -115,7 +115,12 @@ def main():
                     gii_info = {key.split('-')[0]: key.split('-')[1] for 
                                 key in run_info if len(key.split('-')) == 2}
                     task_name = gii_info['task']
-                    run_num = gii_info['run']                    
+                    
+                    if 'run' in gii_info.keys():
+                        run_num = gii_info['run']
+                    else:
+                        run_num = 1
+                        
                     if 'hemi' in gii_info.keys():
                         hemi_name = gii_info['hemi'][0].lower()
                         space_name = gii_info['space']
@@ -134,11 +139,11 @@ def main():
                         
                     file_name = '{0}.{1}h.gii'.format(space_name,hemi_name)
                     
-                    scr = os.path.join(bids_root,subid,sesid,'func', runid)
+                    src = os.path.join(bids_root,subid,sesid,'func', runid)
                     dst = os.path.join(run_dir,file_name)
                     
                     if not os.path.exists(dst):
-                        os.symlink(scr,dst)
+                        os.symlink(src,dst)
                     
                     # shell command
                     # creat meanval and waveform file
@@ -187,6 +192,8 @@ def main():
                                     nii_fpath,float(tr)*1000)
                             subprocess.call(cmd,shell=True)
                             
+                        print('{0} converted'.format(src))
+                            
                     elif (fsrecon_dir is not None) and (tr is None):
                         print('both fsrecon_dir and tr should be provided'
                               'in order to convert gii files to nifti files')
@@ -224,7 +231,11 @@ def main():
                         gii_info = {key.split('-')[0]: key.split('-')[1] for 
                                     key in run_info if len(key.split('-')) == 2}
                         task_name = gii_info['task']
-                        run_num = gii_info['run']
+
+                        if 'run' in gii_info.keys():
+                            run_num = gii_info['run']
+                        else:
+                            run_num = 1
                         
                         task_dir = os.path.join(ses_dir,task_name)
                         if not os.path.exists(task_dir):

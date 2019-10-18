@@ -52,8 +52,10 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
     plt.show()
 
 
-def sub_plot(x, nrows, ncols, plot_type='im', vmin=None, vmax=None,
-           title=None, colormap=None):
+def sub_plot(x, nrows, ncols, sharex=False, sharey=False, 
+             plot_type='im', vmin=None, vmax=None,
+             row_label=None, title=None, cmap='coolwarm',
+             show=True, subplot_kw=None, plot_type_kw=None):
     """
 
     Parameters
@@ -62,27 +64,23 @@ def sub_plot(x, nrows, ncols, plot_type='im', vmin=None, vmax=None,
     """
 
     fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
-                            subplot_kw={'xticks': [], 'yticks': []})
+                            sharex=sharex, sharey=sharey,
+                            subplot_kw=subplot_kw,
+                            figsize=[10, 6])
 
-    if colormap is not None:
-        cmap = plt.cm.get_cmap(colormap)
-    else:
-        cmap = plt.cm.coolwarm
-
-    for ax, i in zip(axs.flat[:len(x)], range(len(x))):
-        if vmin is None:
-            vmin = x[i].min()
-        if vmax is None:
-            vmax = x[i].max()
+    for i, ax in enumerate(axs.flat[:len(x)]):
+        if row_label is not None:
+            if np.mod(i, ncols) == 0:
+                ax.set_ylabel(row_label[i//ncols])
         
         if plot_type == 'im':
-            ax.imshow(x[i], cmap=cmap, vmin=vmin, vmax=vmax)
+            ax.imshow(x[i], cmap=cmap, vmin=vmin, vmax=vmax, **plot_type_kw)
         elif plot_type == 'plot':
-            ax.plot(x[i], vmin=vmin, vmax=vmax)
+            ax.plot(x[i], vmin=vmin, vmax=vmax, **plot_type_kw)
         elif plot_type == 'hist':
-            ax.hist(x[i], vmin=vmin, vmax=vmax)
+            ax.hist(x[i], **plot_type_kw)
         elif plot_type == 'scatter':
-            ax.scatter(x[i][:, 0], x[i][:, 1], vmin=vmin, vmax=vmax, s=0.01)
+            ax.scatter(x[i][:, 0], x[i][:, 1], **plot_type_kw)
         elif plot_type == 'semilogy':
             ax.semilogy(x[i])
             
@@ -90,7 +88,8 @@ def sub_plot(x, nrows, ncols, plot_type='im', vmin=None, vmax=None,
             ax.set_title(str(title[i]))
 #        plt.colorbar(im, ax=ax, fraction=0.02)
     plt.tight_layout()
-    plt.show()
+    if show is True:
+        plt.show()
 
 
 def scatter_bar(matrix, x_bar=None, y_bar=None):

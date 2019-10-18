@@ -134,7 +134,7 @@ def dice(x, y):
     return dice_coef
 
 
-def sparseness(x, norm=False):
+def sparseness(x, type='a', norm=False):
     """
     parameters:
     ----------
@@ -152,6 +152,9 @@ def sparseness(x, norm=False):
     
     sparse_v = ((x.sum(0)/n_stim)**2) / (
             np.asarray([*map(lambda x: x**2, x)]).sum(0)/n_stim)
+    
+    if type == 's':
+        sparse_v = (1 - sparse_v) / (1 - 1/n_stim)
 
     return sparse_v
 
