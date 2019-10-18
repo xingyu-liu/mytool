@@ -24,6 +24,10 @@ def main():
     parser.add_argument('out_dir',
                         type=str,
                         help='the output path for FSFAST file structure')
+    parser.add_argument('--sub',
+                        default=None,
+                        type=str,
+                        help='specify a certain subject. Default is all.')
     parser.add_argument('--fsrecon_dir',
                         default=None,
                         type=str,
@@ -72,17 +76,21 @@ def main():
         vol_fpath,mask_fpath,meanval_path,waveform_path))
         
         return cmd
-        
-    
-    def bids2fsfast(bids_root,out_dir,
-                    fsrecon_dir=None,fwhm=None,tr=None,events_bids_root=None):
+
+
+    def bids2fsfast(bids_root, out_dir,
+                    sub=None, fsrecon_dir=None, events_bids_root=None,
+                    fwhm=0, tr=None):
         
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)       
         
         # convert gii files to fsfast
         os.chdir(bids_root)
-        subidlist = list_dir('sub-*',subdir_only=True)
+        if sub is None:
+            subidlist = list_dir('sub-*',subdir_only=True)
+        else:
+            subidlist = [sub]
     
         for subid in subidlist:
             
@@ -103,13 +111,17 @@ def main():
                 runidlist = list_dir('*.func.gii',subdir_only=False)                
                 for runid in runidlist:
                     run_info = runid.split('_')
-                    key_name = [key.split('-')[0] for key in run_info]
-                    task_name = run_info[key_name.index('task')].split('-')[-1]
-                    run_num = run_info[key_name.index('run')].split('-')[-1]
-                    space_name = run_info[
-                            key_name.index('space')].split('-')[-1]
-                    hemi_name = run_info[
-                            key_name.index('hemi')].split('-')[-1][0].lower()
+
+                    gii_info = {key.split('-')[0]: key.split('-')[1] for 
+                                key in run_info if len(key.split('-')) == 2}
+                    task_name = gii_info['task']
+                    run_num = gii_info['run']                    
+                    if 'hemi' in gii_info.keys():
+                        hemi_name = gii_info['hemi'][0].lower()
+                        space_name = gii_info['space']
+                    else:
+                        hemi_name = gii_info['space'].split('.')[1].lower()
+                        space_name = gii_info['space'].split('.')[0]
                     
                     task_dir = os.path.join(ses_dir,task_name)
                     if not os.path.exists(task_dir):
@@ -209,11 +221,10 @@ def main():
                     runidlist = list_dir('*events.tsv',subdir_only=False)                
                     for runid in runidlist:
                         run_info = runid.split('_')
-                        key_name = [key.split('-')[0] for key in run_info]
-                        task_name = run_info[
-                                key_name.index('task')].split('-')[-1]
-                        run_num = run_info[
-                                key_name.index('run')].split('-')[-1]
+                        gii_info = {key.split('-')[0]: key.split('-')[1] for 
+                                    key in run_info if len(key.split('-')) == 2}
+                        task_name = gii_info['task']
+                        run_num = gii_info['run']
                         
                         task_dir = os.path.join(ses_dir,task_name)
                         if not os.path.exists(task_dir):
