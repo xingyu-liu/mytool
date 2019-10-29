@@ -186,8 +186,9 @@ def plot_chn_cat(data, ref=None, line_cls=None, label=None,
     plt.show()
 
 
-def plot_lines_layers(data, x=None, linestyle='-', label=None,
-                      colormap='rainbow', marker='o', markersize=3):
+def plot_lines_layers(data, x=None, label=None,colormap='rainbow', 
+                      subplot_kw=None,
+                      hist_kw={'linestyle':'-', 'marker':'o', 'markersize':3}):
     """
 
     Parameters
@@ -195,17 +196,15 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
         data: list of array-like x and y
             len(data) = 8, first 5 is conv layer, last 3 is fc layer
     """
-    fig, ax = plt.subplots(figsize=(4, 3))
+    fig, ax = plt.subplots(figsize=(4, 3), subplot_kw=subplot_kw)
 
     if len(data) <= 6 or len(data) > 7:
         sns.set_palette(colormap, n_colors=len(data))
         for series in data:
             if x is None:
-                ax.plot(series[0], series[1], linestyle=linestyle,
-                        marker=marker, markersize=markersize)
+                ax.plot(series[0], series[1], **hist_kw)
             else:
-                ax.plot(x, series, linestyle=linestyle,
-                        marker=marker, markersize=markersize)
+                ax.plot(x, series, **hist_kw)
     elif len(data) == 7:
         cmap = plt.cm.get_cmap('Blues')
         color_norm = plt.Normalize(0, 7)
@@ -219,12 +218,9 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
 
         for i, series in enumerate(data):
             if x is None:
-                ax.plot(series[0], series[1], color=color[i],
-                        linestyle=linestyle,
-                        marker=marker, markersize=markersize)
+                ax.plot(series[0], series[1], color=color[i], **hist_kw)
             else:
-                ax.plot(x, series, color=color[i], linestyle=linestyle,
-                        marker=marker, markersize=markersize)
+                ax.plot(x, series, color=color[i], **hist_kw)
     
 #    ax.invert_xaxis()
 
@@ -241,7 +237,7 @@ def plot_lines_layers(data, x=None, linestyle='-', label=None,
 
 def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
                      density=False, label=None, colormap='rainbow',
-                     histtype='bar', rug=True, hist=False):
+                     histtype='bar', rug=True, hist=False, subplot_kw=None):
     """
 
     Parameters
@@ -249,7 +245,7 @@ def plot_hist_layers(data, bin_num=20, fit=False, show_range=None,
         data: list of 1-d data
         weights : the same shape with data or str 'percentage'
     """
-    fig, ax = plt.subplots(figsize=(4, 3))
+    fig, ax = plt.subplots(figsize=(4, 3), subplot_kw=subplot_kw)
 
     if len(data) <= 6 or len(data) > 7:
         sns.set_palette(colormap, n_colors=len(data))

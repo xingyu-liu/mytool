@@ -78,6 +78,14 @@ def main():
         return cmd
 
 
+bids_root = '/nfs/e3/natural_vision/BOLD5000/derivatives/fmriprep'
+out_dir = '/nfs/e3/natural_vision/BOLD5000/derivatives/fsfast'
+sub = 'sub-CSI4'
+fsrecon_dir = '/nfs/e3/natural_vision/BOLD5000/derivatives/freesurfer'
+tr = 2
+fwhm = 0
+
+
     def bids2fsfast(bids_root, out_dir,
                     sub=None, fsrecon_dir=None, events_bids_root=None,
                     fwhm=0, tr=None):
@@ -106,7 +114,7 @@ def main():
                     
                 with open(os.path.join(ses_dir,'subjectname'),'w') as f:
                     f.write('{0}'.format(subid))
-                          
+
                 os.chdir(os.path.join(bids_root,subid,sesid,'func'))
                 runidlist = list_dir('*.func.gii',subdir_only=False)                
                 for runid in runidlist:
@@ -152,18 +160,22 @@ def main():
                     
                     if (not os.path.exists(meanval_path)) and (
                             not os.path.exists(waveform_path)):
-                        mask_fname = ('{0}space-T1w_desc-brain_mask.nii'
-                                      '.gz'.format(runid.split('space')[0]))
+                        mask_fname = ('{0}space-T1w_brainmask.nii.gz'.format(
+                                runid.split('space')[0]))
+#                        mask_fname = ('{0}space-T1w_desc-brain_mask.nii'
+#                                      '.gz'.format(runid.split('space')[0]))
                         mask_fpath = os.path.join(bids_root,subid,sesid,'func',
                                                   mask_fname)
-                        vol_fname = ('{0}space-T1w_desc-preproc_bold.nii'
-                                     '.gz'.format(runid.split('space')[0]))
+                        vol_fname = ('{0}space-T1w_preproc.nii.gz'.format(
+                                runid.split('space')[0]))
+#                        vol_fname = ('{0}space-T1w_desc-preproc_bold.nii'
+#                                     '.gz'.format(runid.split('space')[0]))
                         vol_fpath = os.path.join(bids_root,subid,sesid,'func',
                                                  vol_fname)                    
                         
                         cmd = meanval_cmd(vol_fpath, mask_fpath,
                                           meanval_path,waveform_path)
-                        subprocess.call(cmd,shell=True)
+                        subprocess.call(cmd, shell=True)
                     
                     # gii 2 nii.gz 
                     if (fsrecon_dir is not None) and (tr is not None):
