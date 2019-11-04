@@ -80,8 +80,9 @@ def main():
 
 bids_root = '/nfs/e3/natural_vision/BOLD5000/derivatives/fmriprep'
 out_dir = '/nfs/e3/natural_vision/BOLD5000/derivatives/fsfast'
-sub = 'sub-CSI4'
+sub = 'sub-CSI2'
 fsrecon_dir = '/nfs/e3/natural_vision/BOLD5000/derivatives/freesurfer'
+events_bids_root = '/nfs/e3/natural_vision/BOLD5000'
 tr = 2
 fwhm = 0
 
@@ -151,6 +152,7 @@ fwhm = 0
                     dst = os.path.join(run_dir,file_name)
                     
                     if not os.path.exists(dst):
+                        os.remove(dst)  # clear possible broken softlink
                         os.symlink(src,dst)
                     
                     # shell command
@@ -222,7 +224,10 @@ fwhm = 0
         if events_bids_root is not None:
             
             os.chdir(events_bids_root)
-            subidlist = list_dir('sub-*',subdir_only=True)
+            if sub is None:
+                subidlist = list_dir('sub-*',subdir_only=True)
+            else:
+                subidlist = [sub]
         
             for subid in subidlist:
                 
@@ -263,6 +268,7 @@ fwhm = 0
                         dst = os.path.join(run_dir, 'events.tsv')
                         
                         if not os.path.exists(dst):
+                            os.remove(dst)  # clear possible broken softlink
                             os.symlink(scr,dst)
             
                 print('{0} evnets done'.format(subid))

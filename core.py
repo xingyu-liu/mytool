@@ -138,9 +138,13 @@ def sparseness(x, type='a', norm=False):
     """
     parameters:
     ----------
-        x: [n_stim, n_cell], firing rate(activation) of each cell 
+        x: [n_sitm] or [n_stim, n_cell], firing rate(activation) of each cell 
             to each stimulus
     """
+    
+    if np.ndim(x) == 1:
+        x = x[:, np.newaxis]
+        
     if norm is True:
         min_max_scaler = MinMaxScaler(feature_range=(0, 1))
         x = min_max_scaler.fit_transform(x)
@@ -520,3 +524,21 @@ def list_stats(x, method='mean', axis=None):
         return np.array([x[i].min(axis) for i in range(len(x))])
     elif method == 'median':
         return np.array([np.median(x[i], axis) for i in range(len(x))])
+    elif method == 'std':
+        return np.array([x[i].std(axis) for i in range(len(x))])
+    elif method == 'mode':
+        return np.array([stats.mode(x[i]) for i in range(len(x))])
+    # ignore nan
+    elif method == 'nanmean':
+        return np.array([np.nanmean(x[i], axis) for i in range(len(x))])
+    elif method == 'nanmax':
+        return np.array([np.nanmax(x[i], axis) for i in range(len(x))])
+    elif method == 'nanmin':
+        return np.array([np.nanmin(x[i], axis) for i in range(len(x))])
+    elif method == 'nanmedian':
+        return np.array([np.nanmedian(x[i], axis) for i in range(len(x))])
+    elif method == 'nanstd':
+        return np.array([np.nanstd(x[i], axis) for i in range(len(x))])
+    # not stats
+    elif method == 'size':
+        return np.array([x[i].size for i in range(len(x))])

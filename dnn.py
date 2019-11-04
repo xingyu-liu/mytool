@@ -52,7 +52,7 @@ class Dnn_act:
         cur_shape = np.shape(self.data)
         new_shape = np.r_[self.cat_num, self.stim_per_cat, cur_shape[1:]]
         cat_data = self.data.reshape(new_shape)
-        return cat_data.mean(1)
+        return cat_data.mean(1), cat_data.std(1)
 
 
 class Chn_score:
