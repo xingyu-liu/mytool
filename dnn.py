@@ -188,7 +188,7 @@ def plot_chn_cat(data, ref=None, line_cls=None, label=None,
 
 def plot_lines_layers(data, x=None, label=None,colormap='rainbow', 
                       subplot_kw=None,
-                      hist_kw={'linestyle':'-', 'marker':'o', 'markersize':3}):
+                      plot_kw={'linestyle':'-', 'marker':'o', 'markersize':3}):
     """
 
     Parameters
@@ -202,9 +202,9 @@ def plot_lines_layers(data, x=None, label=None,colormap='rainbow',
         sns.set_palette(colormap, n_colors=len(data))
         for series in data:
             if x is None:
-                ax.plot(series[0], series[1], **hist_kw)
+                ax.plot(series[0], series[1], **plot_kw)
             else:
-                ax.plot(x, series, **hist_kw)
+                ax.plot(x, series, **plot_kw)
     elif len(data) == 7:
         cmap = plt.cm.get_cmap('Blues')
         color_norm = plt.Normalize(0, 7)
@@ -218,9 +218,9 @@ def plot_lines_layers(data, x=None, label=None,colormap='rainbow',
 
         for i, series in enumerate(data):
             if x is None:
-                ax.plot(series[0], series[1], color=color[i], **hist_kw)
+                ax.plot(series[0], series[1], color=color[i], **plot_kw)
             else:
-                ax.plot(x, series, color=color[i], **hist_kw)
+                ax.plot(x, series, color=color[i], **plot_kw)
     
 #    ax.invert_xaxis()
 

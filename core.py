@@ -527,7 +527,8 @@ def list_stats(x, method='mean', axis=None):
     elif method == 'std':
         return np.array([x[i].std(axis) for i in range(len(x))])
     elif method == 'mode':
-        return np.array([stats.mode(x[i]) for i in range(len(x))])
+        return np.array([stats.mode(x[i])[0] for i in range(len(x))])
+
     # ignore nan
     elif method == 'nanmean':
         return np.array([np.nanmean(x[i], axis) for i in range(len(x))])
@@ -539,6 +540,9 @@ def list_stats(x, method='mean', axis=None):
         return np.array([np.nanmedian(x[i], axis) for i in range(len(x))])
     elif method == 'nanstd':
         return np.array([np.nanstd(x[i], axis) for i in range(len(x))])
+    elif method == 'nanmode':
+        return np.array([stats.mode(x[i], nan_policy='omit')[0] for i 
+                         in range(len(x))])
     # not stats
     elif method == 'size':
         return np.array([x[i].size for i in range(len(x))])
