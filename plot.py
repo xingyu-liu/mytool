@@ -55,7 +55,7 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
 def sub_plot(x, nrows, ncols, sharex=False, sharey=False, 
              plot_type='im', vmin=None, vmax=None,
              row_label=None, title=None, cmap='coolwarm',
-             show=True, subplot_kw=None, plot_type_kw=None):
+             show=True, subplot_kw=None, plot_type_kw={}):
     """
 
     Parameters
