@@ -140,20 +140,20 @@ def glm_model(y, x, target_ft=None):
 
 
 # plot
-def plot_chn_cat(data, ref=None, line_cls=None, label=None,
-                 linestyle='-', markersize=1, refmarkersize=10):
+def plot_chn_cat(data, ref=None, ax=None, line_cls=None, label=None,
+                 linestyle='', markersize=1, refmarkersize=3):
 
     """
     Parameters
     ---------
 
-        data: shape = [n_point,n_line]
+        data: list or array(shape = [n_point,n_line])
         ref: highlight one line,type=int
         cat_cls: summary line into higher level class
 
     """
-
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
 
     color = ['limegreen', 'orange', 'cornflowerblue', 'silver', 'lightcoral',
              'hotpink', 'blueviolet', 'gold']
