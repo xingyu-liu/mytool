@@ -55,7 +55,7 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
 def sub_plot(x, nrows, ncols, sharex=False, sharey=False, 
              plot_type='im', vmin=None, vmax=None,
              row_label=None, title=None, cmap='coolwarm',
-             show=True, subplot_kw=None, plot_type_kw={}):
+             show=True, subplot_kw=None, figsize=[10, 6], plot_type_kw={}):
     """
 
     Parameters
@@ -66,7 +66,7 @@ def sub_plot(x, nrows, ncols, sharex=False, sharey=False,
     fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
                             sharex=sharex, sharey=sharey,
                             subplot_kw=subplot_kw,
-                            figsize=[10, 6])
+                            figsize=figsize)
 
     for i, ax in enumerate(axs.flat[:len(x)]):
         if row_label is not None:
