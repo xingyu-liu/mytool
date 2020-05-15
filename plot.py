@@ -77,6 +77,8 @@ def sub_plot(x, nrows, ncols, sharex=False, sharey=False,
             ax.imshow(x[i], cmap=cmap, vmin=vmin, vmax=vmax, **plot_type_kw)
         elif plot_type == 'plot':
             ax.plot(x[i], vmin=vmin, vmax=vmax, **plot_type_kw)
+        elif plot_type == 'pcolor':
+            ax.pcolor(x[i], cmap=cmap, vmin=vmin, vmax=vmax, **plot_type_kw)
         elif plot_type == 'hist':
             ax.hist(x[i], **plot_type_kw)
         elif plot_type == 'scatter':

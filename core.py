@@ -116,6 +116,22 @@ def tSNR(data):
     return data_tSNR
 
 
+def d_prime(hits, misses, fas, crs):
+    # Floors an ceilings are replaced by half hits and half FA's
+    half_hit = 0.5 / (hits + misses)[0, 0]
+    half_fa = 0.5 / (fas + crs)[0, 0]
+    # Calculate hit_rate and avoid d' infinity
+    hit_rate = hits / (hits + misses)
+    hit_rate[hit_rate==1] = 1 - half_hit
+    hit_rate[hit_rate==0] = half_hit 
+    # Calculate false alarm rate and avoid d' infinity
+    fa_rate = fas / (fas + crs)
+    fa_rate[fa_rate==1] = 1 - half_fa
+    fa_rate[fa_rate==0] = half_fa
+
+    return stats.norm.ppf(hit_rate) - stats.norm.ppf(fa_rate)
+
+
 def dice(x, y):
     """
     parameters:
@@ -134,7 +150,7 @@ def dice(x, y):
     return dice_coef
 
 
-def sparseness(x, type='a', norm=False):
+def sparseness(x, type='s', norm=False):
     """
     parameters:
     ----------
@@ -146,9 +162,10 @@ def sparseness(x, type='a', norm=False):
         x = x[:, np.newaxis]
         
     if norm is True:
+
         min_max_scaler = MinMaxScaler(feature_range=(0, 1))
         x = min_max_scaler.fit_transform(x)
-    
+   
     n_stim = x.shape[0]
 
     # make sure any x > 0
@@ -156,6 +173,8 @@ def sparseness(x, type='a', norm=False):
     
     sparse_v = ((x.sum(0)/n_stim)**2) / (
             np.asarray([*map(lambda x: x**2, x)]).sum(0)/n_stim)
+    # set sparse_v of cells that are always silent to 1
+    sparse_v[x.sum(0) == 0] = 1
     
     if type == 's':
         sparse_v = (1 - sparse_v) / (1 - 1/n_stim)
@@ -360,159 +379,6 @@ def rank(data, axis=0, order='descending'):
 
     return ranks
 
-
-def roiing_volume(roi_annot, volume_ts, roix_regressed):
-    # not_roi = np.where(roi_annot == 0)
-    # volume_ts[not_roi[0],not_roi[1],not_roi[2],:] = 0
-    roi_ts = []
-
-    roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)[1:]
-    for i in roi_label:
-        roi_i_loc = np.where(roi_annot == i)
-        roi_i = []
-        for j in range(len(roi_i_loc[0])):
-            roi_i.append(volume_ts[roi_i_loc[0][j], roi_i_loc[1][j],
-                                   roi_i_loc[2][j], :])
-        roi_i = np.asarray(roi_i, dtype=np.float64)
-        roi_ts.append(roi_i)
-
-    if roix_regressed:
-        roix_loc = np.where(roi_annot == roix_regressed)
-        roix = roi_ts[roix_loc[0], roix_loc[1], roix_loc[2], :].mean(0)
-        roix = roix.reshape(-1, 1)
-        roi_ts_xregressed = roi_ts
-        for i in range(len(roi_ts)):
-            for j in range(np.shape([roi_ts[i]])[0]):
-                observed_y = roi_ts[i][j, :].reshape(-1, 1)
-                roi_ts_xregressed[i] = residual(roix, observed_y)[:, 0]
-        roi_ts = roi_ts_xregressed
-
-    return roi_ts
-
-
-def roiing_volume_roi_mean(roi_annot, volume_ts):
-    # roi_annot should always start with 1
-
-    roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)[1:]
-    roi_ts = np.zeros([roi_label.max(), 1, 1, np.shape(volume_ts)[-1]])
-
-    for i in roi_label:
-        roi_i_loc = np.where(roi_annot == i)
-        roi_i = volume_ts[roi_i_loc[0], roi_i_loc[1], roi_i_loc[2], :]
-        roi_ts[i-1, 0, 0, :] = roi_i.mean(0)
-
-    return roi_ts
-
-
-def get_n_ring_neighbor(faces, n=1, ordinal=False, mask=None):
-    """ copy from freeroi by Xiayu CHEN
-    get n ring neighbor from faces array
-
-    Parameters
-    ----------
-    faces : numpy array
-        the array of shape [n_triangles, 3]
-    n : integer
-        specify which ring should be got
-    ordinal : bool
-        True: get the n_th ring neighbor
-        False: get the n ring neighbor
-    mask : 1-D numpy array
-        specify a area where the ROI is
-        non-ROI element's value is zero
-
-    Returns
-    -------
-    lists
-        each index of the list represents a vertex number
-        each element is a set which includes neighbors of corresponding vertex
-    """
-
-    from scipy import sparse
-
-    def mesh_edges(faces):
-        """
-        Returns sparse matrix with edges as an adjacency matrix
-        Parameters
-        ----------
-        faces : array of shape [n_triangles x 3]
-            The mesh faces
-        Returns
-        -------
-        edges : sparse matrix
-            The adjacency matrix
-        """
-        npoints = np.max(faces) + 1
-        nfaces = len(faces)
-        a, b, c = faces.T
-        edges = sparse.coo_matrix((np.ones(nfaces), (a, b)),
-                                  shape=(npoints, npoints))
-        edges = edges + sparse.coo_matrix((np.ones(nfaces), (b, c)),
-                                          shape=(npoints, npoints))
-        edges = edges + sparse.coo_matrix((np.ones(nfaces), (c, a)),
-                                          shape=(npoints, npoints))
-        edges = edges + edges.T
-        edges = edges.tocoo()
-        return edges
-
-    n_vtx = np.max(faces) + 1  # get the number of vertices
-    if mask is not None and np.nonzero(mask)[0].shape[0] == n_vtx:
-        # In this case, the mask covers all vertices.
-        # So the program reset it as a None to save the computational cost.
-        mask = None
-
-    # find 1_ring neighbors' id for each vertex
-    coo_w = mesh_edges(faces)
-    csr_w = coo_w.tocsr()
-    if mask is None:
-        vtx_iter = range(n_vtx)
-        n_ring_neighbors = [
-                csr_w.indices[csr_w.indptr[i]:csr_w.indptr[i+1]] for i
-                in vtx_iter]
-        n_ring_neighbors = [set(i) for i in n_ring_neighbors]
-    else:
-        mask_id = np.nonzero(mask)[0]
-        vtx_iter = mask_id
-        n_ring_neighbors = [
-                set(csr_w.indices[csr_w.indptr[i]:csr_w.indptr[i+1]])
-                if mask[i] != 0 else set() for i in range(n_vtx)]
-        for vtx in vtx_iter:
-            neighbor_set = n_ring_neighbors[vtx]
-            neighbor_iter = list(neighbor_set)
-            for i in neighbor_iter:
-                if mask[i] == 0:
-                    neighbor_set.discard(i)
-
-    if n > 1:
-        # find n_ring neighbors
-        one_ring_neighbors = [i.copy() for i in n_ring_neighbors]
-        n_th_ring_neighbors = [i.copy() for i in n_ring_neighbors]
-        # if n>1, go to get more neighbors
-        for i in range(n-1):
-            for neighbor_set in n_th_ring_neighbors:
-                neighbor_set_tmp = neighbor_set.copy()
-                for v_id in neighbor_set_tmp:
-                    neighbor_set.update(one_ring_neighbors[v_id])
-
-            if i == 0:
-                for v_id in vtx_iter:
-                    n_th_ring_neighbors[v_id].remove(v_id)
-
-            for v_id in vtx_iter:
-                # get the (i+2)_th ring neighbors
-                n_th_ring_neighbors[v_id] -= n_ring_neighbors[v_id]
-                # get the (i+2) ring neighbors
-                n_ring_neighbors[v_id] |= n_th_ring_neighbors[v_id]
-    elif n == 1:
-        n_th_ring_neighbors = n_ring_neighbors
-    else:
-        raise RuntimeError(
-                'The number of rings should be equal or greater than 1!')
-
-    if ordinal:
-        return n_th_ring_neighbors
-    else:
-        return n_ring_neighbors
 
 
 def list_stats(x, method='mean', axis=None):

@@ -7,7 +7,7 @@ This is a temporary script file.
 """
 
 import numpy as np
-# import statsmodels.formula.api as smf
+import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import seaborn as sns
 
