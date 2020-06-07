@@ -10,33 +10,28 @@ import mytool.core
 from nibabel.cifti2 import cifti2
 
 
-def roiing_volume(roi_annot, volume_ts, roix_regressed):
-    # not_roi = np.where(roi_annot == 0)
-    # volume_ts[not_roi[0],not_roi[1],not_roi[2],:] = 0
-    roi_ts = []
-
-    roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)[1:]
+def roiing_volume(roi_annot, data, method='nanmean'):
+    
+    roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)
+    roi_label = roi_label[roi_label!=0]
+    
+    roi_data = []
+    
     for i in roi_label:
-        roi_i_loc = np.where(roi_annot == i)
-        roi_i = []
-        for j in range(len(roi_i_loc[0])):
-            roi_i.append(volume_ts[roi_i_loc[0][j], roi_i_loc[1][j],
-                                   roi_i_loc[2][j], :])
-        roi_i = np.asarray(roi_i, dtype=np.float64)
-        roi_ts.append(roi_i)
-
-    if roix_regressed:
-        roix_loc = np.where(roi_annot == roix_regressed)
-        roix = roi_ts[roix_loc[0], roix_loc[1], roix_loc[2], :].mean(0)
-        roix = roix.reshape(-1, 1)
-        roi_ts_xregressed = roi_ts
-        for i in range(len(roi_ts)):
-            for j in range(np.shape([roi_ts[i]])[0]):
-                observed_y = roi_ts[i][j, :].reshape(-1, 1)
-                roi_ts_xregressed[i] = mytool.core.residual(roix, observed_y)[:, 0]
-        roi_ts = roi_ts_xregressed
-
-    return roi_ts
+        # ignore nan
+        if method == 'nanmean':
+            roi_data.append(np.nanmean(data[roi_annot==i], 0))
+        elif method == 'nanstd':
+            roi_data.append(np.nanstd(data[roi_annot==i], 0))        
+        elif method == 'nanmax':
+            roi_data.append(np.nanmax(data[roi_annot==i], 0))
+        elif method == 'nanmin':
+            roi_data.append(np.nanmin(data[roi_annot==i], 0))
+        elif method == 'nansize':
+            roi_data.append(np.sum(~np.isnan(data[roi_annot==i])))
+    
+    roi_data = np.asarray(roi_data)
+    return roi_label, roi_data
 
 
 def roiing_volume_roi_mean(roi_annot, volume_ts):
