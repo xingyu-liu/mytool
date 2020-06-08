@@ -10,10 +10,13 @@ import mytool.core
 from nibabel.cifti2 import cifti2
 
 
-def roiing_volume(roi_annot, data, method='nanmean'):
-    
-    roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)
-    roi_label = roi_label[roi_label!=0]
+def roiing_volume(roi_annot, data, method='nanmean', label=None):
+
+    if label is not None:
+        roi_label = label
+    else:
+        roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)
+        roi_label = roi_label[roi_label!=0]
     
     roi_data = []
     
@@ -21,6 +24,8 @@ def roiing_volume(roi_annot, data, method='nanmean'):
         # ignore nan
         if method == 'nanmean':
             roi_data.append(np.nanmean(data[roi_annot==i], 0))
+        elif method == 'nanmedian':
+            roi_data.append(np.nanmedian(data[roi_annot==i], 0))  
         elif method == 'nanstd':
             roi_data.append(np.nanstd(data[roi_annot==i], 0))        
         elif method == 'nanmax':
@@ -32,20 +37,6 @@ def roiing_volume(roi_annot, data, method='nanmean'):
     
     roi_data = np.asarray(roi_data)
     return roi_label, roi_data
-
-
-def roiing_volume_roi_mean(roi_annot, volume_ts):
-    # roi_annot should always start with 1
-
-    roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)[1:]
-    roi_ts = np.zeros([roi_label.max(), 1, 1, np.shape(volume_ts)[-1]])
-
-    for i in roi_label:
-        roi_i_loc = np.where(roi_annot == i)
-        roi_i = volume_ts[roi_i_loc[0], roi_i_loc[1], roi_i_loc[2], :]
-        roi_ts[i-1, 0, 0, :] = roi_i.mean(0)
-
-    return roi_ts
 
 
 def get_n_ring_neighbor(faces, n=1, ordinal=False, mask=None):
