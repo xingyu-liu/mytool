@@ -261,7 +261,7 @@ def dendo_community(x):
     return sorted_x, sort_index
 
 
-def cluster(X, last_merge_number, cluster_number):
+def cluster(X, last_merge_number, cluster_number, label=None):
     from time import time
     from scipy.cluster import hierarchy
 
@@ -270,7 +270,7 @@ def cluster(X, last_merge_number, cluster_number):
     print("%.2fs" % (time() - t0))
 
     plt.figure(figsize=(8, 12))
-    hierarchy.dendrogram(Z, above_threshold_color='#bcbddc',
+    hierarchy.dendrogram(Z, above_threshold_color='#bcbddc',labels=label,
                          orientation='right')
     plt.show()
 
@@ -458,3 +458,5 @@ def partial_corr(C):
             P_corr[j, i] = corr
         
     return P_corr
+
+    

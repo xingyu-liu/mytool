@@ -12,9 +12,9 @@ import seaborn as sns
 
 
 def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
-        delete_diag=None, show_value=None, colormap=None):
+        delete_diag=False, show_value=False, colormap=None):
 
-    if delete_diag is not None:
+    if delete_diag is True:
         data[range(np.size(data, 0)), range(np.size(data, 0))] = 0
 
     if fig_size is not None:
@@ -42,8 +42,8 @@ def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
         plt.xticks(np.arange(np.size(data, 1)), label, rotation=90)
         plt.yticks(np.arange(np.size(data, 0)), label)
 
-    if show_value is not None:
-        valfmt = matplotlib.ticker.StrMethodFormatter('{x:.0f}')
+    if show_value is True:
+        valfmt = matplotlib.ticker.StrMethodFormatter('{x:.2f}')
         for i in range(np.size(data, 0)):
             for j in range(np.size(data, 1)):
                 plt.text(j, i, valfmt(data[i, j]),
@@ -74,8 +74,8 @@ def sub_plot(x, nrows, ncols, plot_type='im', sharex=False, sharey=False,
         
         if plot_type == 'im':
             ax.imshow(x[i], cmap=cmap, vmin=vmin, vmax=vmax, **plot_type_kw)
-        elif plot_type == 'plot':
-            ax.plot(x[i], vmin=vmin, vmax=vmax, **plot_type_kw)
+        elif plot_type == 'line':
+            ax.plot(x[i], **plot_type_kw)
         elif plot_type == 'pcolor':
             ax.pcolor(x[i], cmap=cmap, vmin=vmin, vmax=vmax, **plot_type_kw)
         elif plot_type == 'hist':
