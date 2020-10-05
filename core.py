@@ -150,6 +150,13 @@ def dice(x, y):
     return dice_coef
 
 
+def normalize(x, norm_range=[0,1]):
+    min_max_scaler = MinMaxScaler(feature_range=(0, 1))
+    x = min_max_scaler.fit_transform(x)
+    
+    return x
+
+
 def sparseness(x, type='s', norm=False):
     """
     parameters:
