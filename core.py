@@ -9,6 +9,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
+import copy
 
 
 def isc(data1, data2=None):
@@ -151,10 +152,37 @@ def dice(x, y):
 
 
 def normalize(x, norm_range=[0,1]):
+    dim = np.ndim(x)
+    if dim == 1:
+        x = x[..., None]
     min_max_scaler = MinMaxScaler(feature_range=(0, 1))
-    x = min_max_scaler.fit_transform(x)
-    
+    x = min_max_scaler.fit_transform(x)  
+    if dim == 1:
+        x = x[:, 0]
+        
     return x
+
+def thr_IQR(x, times=3, series=False, exclude_zero=True):
+    # if series is True, the last axis should be series
+    
+    if series is False:
+        x = x[...,None]
+
+    if exclude_zero is True:
+        qu = np.asarray([np.nanquantile(x[..., i][x[..., i]!=0], 0.75) for i in range(x.shape[-1])])
+        ql = np.asarray([np.nanquantile(x[..., i][x[..., i]!=0], 0.25) for i in range(x.shape[-1])])
+    else:
+        qu = np.asarray([np.nanquantile(x[..., i], 0.75) for i in range(x.shape[-1])])
+        ql = np.asarray([np.nanquantile(x[..., i], 0.25) for i in range(x.shape[-1])])      
+        
+    x_post = copy.deepcopy(x)
+    x_post[x_post > (qu + times*(qu-ql))] = np.nan
+    x_post[x_post < (ql - times*(qu-ql))] = np.nan
+    
+    if series is False:
+        return x_post[...,0]
+    else:
+        return x_post
 
 
 def sparseness(x, type='s', norm=False):

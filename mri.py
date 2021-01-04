@@ -10,17 +10,17 @@ import mytool.core
 from nibabel.cifti2 import cifti2
 
 
-def roiing_volume(roi_annot, data, method='nanmean', label=None):
+def roiing_volume(roi_annot, data, method='nanmean', key=None):
 
-    if label is not None:
-        roi_label = label
+    if key is not None:
+        roi_key = key
     else:
-        roi_label = np.asarray(np.unique(roi_annot), dtype=np.int)
-        roi_label = roi_label[roi_label!=0]
+        roi_key = np.asarray(np.unique(roi_annot), dtype=np.int)
+        roi_key = roi_key[roi_key!=0]
     
     roi_data = []
     
-    for i in roi_label:
+    for i in roi_key:
         # ignore nan
         if method == 'nanmean':
             roi_data.append(np.nanmean(data[roi_annot==i], 0))
@@ -36,7 +36,7 @@ def roiing_volume(roi_annot, data, method='nanmean', label=None):
             roi_data.append(np.sum(~np.isnan(data[roi_annot==i])))
     
     roi_data = np.asarray(roi_data)
-    return roi_label, roi_data
+    return roi_key, roi_data
 
 
 def get_n_ring_neighbor(faces, n=1, ordinal=False, mask=None):
