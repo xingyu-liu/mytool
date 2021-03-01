@@ -10,3 +10,4 @@ from mytool import core
 from mytool import utils
 from mytool import mri
 from mytool import dnn
+from mytool import heritability

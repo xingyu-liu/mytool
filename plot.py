@@ -11,6 +11,21 @@ import matplotlib
 import seaborn as sns
 
 
+# get_rgba
+def get_rgba(data, cmap='jet', clip_pct=[0.05, 0.95], nonzero=False):
+
+    if nonzero is True:
+        norm = matplotlib.colors.Normalize(vmin=np.quantile(data[data!=0], clip_pct[0]), vmax=np.quantile(data[data!=0], clip_pct[1]), clip=True)
+    else:
+        norm = matplotlib.colors.Normalize(vmin=np.quantile(data, clip_pct[0]), vmax=np.quantile(data, clip_pct[1]), clip=True)
+    mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+
+    color = np.asarray(mapper.to_rgba(data.reshape(-1), bytes=True))/255
+    color = color.reshape(np.r_[data.shape,4])
+    
+    return color
+
+
 def rdm(data, label=None, fig_size=None, title=None, vmin=None, vmax=None,
         delete_diag=False, show_value=False, colormap=None):
 
