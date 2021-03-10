@@ -109,17 +109,14 @@ def filter_twins_id(data, limit_set, trg_file=None):
     return data
 
 
-def icc(x, y=None, n_bootstrap=None, confidence=95):
+def icc(x, n_bootstrap=None, confidence=95):
     '''
     Calculate intraclass correlation between two squences.
     Parameters
     ----------
-    x : array-like
-        If y is None, x must be a 2D array-like data. The number of rows must
-        be two (2 x n matrix), which represent two sequences respectively.
-        If y is a sequence, x must be a sequence too.
-    y : 1D array-like
-        the second sequence
+    x : array-like, 2D or 3D
+        2D shape: [2, n_sample]
+        3D shape: [2, n_sample, n_features]
     n_bootstrap : positive integer
         If is not None, do bootstrap with n_bootstrap iterations.
     confidence : a number between 0 and 100
@@ -139,11 +136,9 @@ def icc(x, y=None, n_bootstrap=None, confidence=95):
     r_ub : float
         upper boundary of confidence interval
         Only returned when n_bootstrap is not None.
-    References
-    ----------
-    https://github.com/noahbenson/hcp-lines/blob/master/notebooks/hcp-lines.ipynb
+
     '''
-    x = np.asarray(x if y is None else [x, y])
+
     assert x.shape[0] == 2
 
     if n_bootstrap is not None:
@@ -151,12 +146,21 @@ def icc(x, y=None, n_bootstrap=None, confidence=95):
         rng = np.arange(n)
         rs = [icc(x[:, np.random.choice(rng, n)]) for _ in range(n_bootstrap)]
         lev = 0.5 * (100 - confidence)
-        return tuple(np.percentile(rs, [lev, 50, 100-lev]))
+        
+        rs = np.asarray(rs)
+        return np.percentile(rs, [50, lev, 100-lev], axis=0), rs
 
-    mu0 = np.mean(x, axis=0)
-    ms0 = np.sum((x - mu0)**2) / x.shape[1]
-    ms1 = np.var(mu0, ddof=1)*2
-    r = (ms1 - ms0) / (ms0 + ms1)
+    mu_t = np.nanmean(x, (0, 1))  
+    mu_b = np.nanmean(x, axis=0)
+    mu_w = np.nanmean(x, axis=1)
+    
+    ms_b = np.nansum(((mu_b - mu_t)**2) * 2, 0) / (x.shape[1] - 1)
+    ms_e = (np.nansum((x - mu_t)**2, (0,1)) - 
+            np.nansum((mu_b - mu_t)**2, (0)) * 2 - 
+            np.nansum((mu_w - mu_t)**2, (0)) * x.shape[1]) / (x.shape[1] - 1)
+    
+    r = (ms_b - ms_e) / (ms_b + ms_e)
+    
     return r
 
 
@@ -165,10 +169,9 @@ def heritability(mz, dz, n_bootstrap=None, confidence=95):
     heritability(mz, dz) yields Falconer's heritability index, h^2.
     Parameters
     ----------
-    mz : 2D array-like
-        The number of rows must be two (2 x n matrix).
-    dz : 2D array-like
-        The number of rows must be two (2 x n matrix).
+    mz, dz: array-like, 2D or 3D
+        2D shape: [2, n_sample]
+        23 shape: [2, n_sample, n_features]
     n_bootstrap : positive integer
         If is not None, do bootstrap with n_bootstrap iterations.
     confidence : a number between 0 and 100
@@ -197,15 +200,11 @@ def heritability(mz, dz, n_bootstrap=None, confidence=95):
         r_dz = icc(dz)
         h2 = 2 * (r_mz - r_dz)
         return h2
+    
     else:
-        mz, dz = np.asarray(mz), np.asarray(dz)
-        assert mz.shape[0] == 2 and dz.shape[0] == 2
-        n_mz, n_dz = mz.shape[1], dz.shape[1]
-        mz_rng, dz_rng = np.arange(n_mz), np.arange(n_dz)
-        h2s = np.zeros(n_bootstrap)
-        for i in range(n_bootstrap):
-            mz_indices = np.random.choice(mz_rng, n_mz)
-            dz_indices = np.random.choice(dz_rng, n_dz)
-            h2s[i] = heritability(mz[:, mz_indices], dz[:, dz_indices])
+        _, r_mz = icc(mz, n_bootstrap=n_bootstrap, confidence=confidence)
+        _, r_dz = icc(dz, n_bootstrap=n_bootstrap, confidence=confidence)
+        h2 = 2 * (r_mz - r_dz)
+
         lev = 0.5 * (100 - confidence)
-        return tuple(np.percentile(h2s, [50, lev, 100-lev]))
+        return np.percentile(h2, [50, lev, 100-lev], axis=0), h2
