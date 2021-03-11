@@ -137,6 +137,9 @@ def icc(x, n_bootstrap=None, confidence=95):
         upper boundary of confidence interval
         Only returned when n_bootstrap is not None.
 
+    References
+    ----------
+    https://github.com/noahbenson/hcp-lines/blob/master/notebooks/hcp-lines.ipynb
     '''
 
     assert x.shape[0] == 2
@@ -150,15 +153,24 @@ def icc(x, n_bootstrap=None, confidence=95):
         rs = np.asarray(rs)
         return np.percentile(rs, [50, lev, 100-lev], axis=0), rs
 
-    mu_t = np.nanmean(x, (0, 1))  
+# =============================================================================
+#     # ICC Class 3    
+#     mu_t = np.nanmean(x, (0, 1))  
+#     mu_b = np.nanmean(x, axis=0)
+#     mu_w = np.nanmean(x, axis=1)
+#     
+#     ms_b = np.nansum(((mu_b - mu_t)**2) * 2, 0) / (x.shape[1] - 1)
+#     ms_e = (np.nansum((x - mu_t)**2, (0,1)) - 
+#             np.nansum((mu_b - mu_t)**2, (0)) * 2 - 
+#             np.nansum((mu_w - mu_t)**2, (0)) * x.shape[1]) / (x.shape[1] - 1)
+#     
+#     r = (ms_b - ms_e) / (ms_b + ms_e)
+# =============================================================================
+    
+    # ICC Class 1
     mu_b = np.nanmean(x, axis=0)
-    mu_w = np.nanmean(x, axis=1)
-    
-    ms_b = np.nansum(((mu_b - mu_t)**2) * 2, 0) / (x.shape[1] - 1)
-    ms_e = (np.nansum((x - mu_t)**2, (0,1)) - 
-            np.nansum((mu_b - mu_t)**2, (0)) * 2 - 
-            np.nansum((mu_w - mu_t)**2, (0)) * x.shape[1]) / (x.shape[1] - 1)
-    
+    ms_e = np.nansum((x - mu_b)**2, (0,1)) / x.shape[1]
+    ms_b = np.nanvar(mu_b, axis=0, ddof=1)*2
     r = (ms_b - ms_e) / (ms_b + ms_e)
     
     return r
@@ -191,6 +203,7 @@ def heritability(mz, dz, n_bootstrap=None, confidence=95):
     h2_ub : float
         upper boundary of confidence interval
         Only returned when n_bootstrap is not None.
+        
     References
     ----------
     https://github.com/noahbenson/hcp-lines/blob/master/notebooks/hcp-lines.ipynb
