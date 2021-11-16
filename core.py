@@ -152,10 +152,13 @@ def dice(x, y):
 
 
 def normalize(x, norm_range=[0,1]):
+    """ 
+    if series is True, the last axis should be series 
+    """
     dim = np.ndim(x)
     if dim == 1:
         x = x[..., None]
-    min_max_scaler = MinMaxScaler(feature_range=(0, 1))
+    min_max_scaler = MinMaxScaler(feature_range=norm_range)
     x = min_max_scaler.fit_transform(x)  
     if dim == 1:
         x = x[:, 0]
@@ -163,10 +166,12 @@ def normalize(x, norm_range=[0,1]):
     return x
 
 def thr_IQR(x, times=3, series=False, exclude_zero=True):
-    # if series is True, the last axis should be series
+    """ 
+    if series is True, the last axis should be series 
+    """
     
     if series is False:
-        x = x[...,None]
+        x = x[..., None]
 
     if exclude_zero is True:
         qu = np.asarray([np.nanquantile(x[..., i][x[..., i]!=0], 0.75) for i in range(x.shape[-1])])
