@@ -72,6 +72,8 @@ def isfc(data1, data2=None):
     """
     if data2 is None:
         data2 = data1
+    data1 = np.nan_to_num(data1)
+    data2 = np.nan_to_num(data2)
 
     corr = np.nan_to_num(1 - cdist(data1, data2, metric='correlation'))
     return corr
@@ -379,6 +381,11 @@ def cohen_d(pre, post):
 
 def residual(X, y):
     from sklearn.linear_model import LinearRegression
+
+    if np.ndim(X) == 1:
+        X = X[..., None]
+    if np.ndim(y) == 1:
+        y = y[..., None]
 
     model = LinearRegression().fit(X, y)
     predict_y = model.predict(X)

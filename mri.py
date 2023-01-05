@@ -5,10 +5,12 @@ Created on Fri May 15 23:25:50 2020
 
 @author: liuxingyu
 """
-import numpy as np
-import mytool.core
-from nibabel.cifti2 import cifti2
 
+import numpy as np
+from nibabel.cifti2 import cifti2
+from scipy.signal import fftconvolve
+from nipy.modalities.fmri.hemodynamic_models import spm_hrf
+import copy
 
 def roiing_volume(roi_annot, data, method='nanmean', key=None):
 
@@ -320,7 +322,6 @@ class CiftiReader(object):
         else:
             return _data
 
-
 def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label_tables=None):
     """ copy from freeroi by Xiayu CHEN
     Save data as a cifti file
@@ -356,26 +357,34 @@ def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label
         idx_type0 = 'CIFTI_INDEX_TYPE_LABELS'
     elif file_path.endswith('.dscalar.nii'):
         idx_type0 = 'CIFTI_INDEX_TYPE_SCALARS'
+    elif file_path.endswith('.dtseries.nii'):
+        idx_type0 = 'CIFTI_INDEX_TYPE_SERIES'
     else:
         raise TypeError('Unsupported File Format')
-
-    if map_names is None:
-        map_names = [None] * data.shape[0]
-    else:
-        assert data.shape[0] == len(map_names), "Map_names are mismatched with the data"
-
-    if label_tables is None:
-        label_tables = [None] * data.shape[0]
-    else:
-        assert data.shape[0] == len(label_tables), "Label_tables are mismatched with the data"
 
     # CIFTI_INDEX_TYPE_SCALARS always corresponds to Cifti2Image.header.get_index_map(0),
     # and this index_map always contains some scalar information, such as named_maps.
     # We can get label_table and map_name and metadata from named_map.
-    mat_idx_map0 = cifti2.Cifti2MatrixIndicesMap([0], idx_type0)
-    for mn, lbt in zip(map_names, label_tables):
-        named_map = cifti2.Cifti2NamedMap(mn, label_table=lbt)
-        mat_idx_map0.append(named_map)
+    if idx_type0 != 'CIFTI_INDEX_TYPE_SERIES':
+        mat_idx_map0 = cifti2.Cifti2MatrixIndicesMap([0], idx_type0)
+
+        if map_names is None:
+            map_names = [None] * data.shape[0]
+        else:
+            assert data.shape[0] == len(map_names), "Map_names are mismatched with the data"
+
+        if label_tables is None:
+            label_tables = [None] * data.shape[0]
+        else:
+            assert data.shape[0] == len(label_tables), "Label_tables are mismatched with the data"
+
+        for mn, lbt in zip(map_names, label_tables):
+            named_map = cifti2.Cifti2NamedMap(mn, label_table=lbt)
+            mat_idx_map0.append(named_map)
+    else:
+        mat_idx_map0 = cifti2.Cifti2MatrixIndicesMap([0], idx_type0, \
+                number_of_series_points=data.shape[0], series_exponent=1, \
+                    series_start=0, series_step=1, series_unit='second')
 
     # CIFTI_INDEX_TYPE_BRAIN_MODELS always corresponds to Cifti2Image.header.get_index_map(1),
     # and this index_map always contains some brain_structure information, such as brain_models and volume.
@@ -390,4 +399,88 @@ def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label
     matrix.append(mat_idx_map1)
     header = cifti2.Cifti2Header(matrix)
     img = cifti2.Cifti2Image(data, header)
+
     cifti2.save(img, file_path)
+
+
+def convolve_hrf(X, onsets, durations, n_vol, tr, ops=100):
+    """
+    Convolve each X's column iteratively with HRF and align with the timeline of BOLD signal
+    Parameters
+    ----------
+    X : array
+        Shape = n_event or [n_event, n_condition]
+    onsets : array_like
+        In sec. size = n_event
+    durations : array_like
+        In sec. size = n_event
+    n_vol : int
+        The number of volumes of BOLD signal
+    tr : float
+        Repeat time in second
+    ops : int
+        Oversampling number per second, must be one of the (10, 100, 1000)
+
+    Returns
+    -------
+    X_hrfed : array
+        The result after convolution and alignment
+        shape = n_vol or [n_event, n_vol]
+    """
+
+    if np.ndim(X) == 1:
+        X = X[..., None]
+    assert np.ndim(X) == 2, 'X must be a 1D or 2D array'
+
+    assert X.shape[0] == onsets.shape[0] and X.shape[0] == durations.shape[0], \
+        'The length of onsets and durations should be matched with the number of events.'
+    assert ops in (10, 100, 1000), 'Oversampling rate must be one of the (10, 100, 1000)!'
+
+    # unify the precision
+    decimals = int(np.log10(ops))
+    onsets = np.round(np.asarray(onsets), decimals=decimals)
+    durations = np.round(np.asarray(durations), decimals=decimals)
+    tr = np.round(tr, decimals=decimals)
+    
+    assert onsets.min() >= 0, 'The onsets must be non-negative'
+    if onsets.min() > 0:
+        # The earliest event's onset is later than the start point of response.
+        # We supplement it with zero-value event to align with the response.
+        X = np.insert(X, 0, np.zeros(X.shape[1]), 0)
+        durations = np.insert(durations, 0, onsets.min(), 0)
+        onsets = np.insert(onsets, 0, 0, 0)
+
+    # compute volume acquisition timing
+    vol_t = (np.arange(n_vol) * tr * ops).astype(int)  
+
+    # # generate hrf kernel
+    hrf = np.array(spm_hrf(tr, oversampling=tr*ops))
+    hrf = hrf[..., None]
+    # hrf = np.load('mytool/hrf.npy') 
+
+    # do convolution in batches for trade-off between speed and memory
+    batch_size = int(100000 / ops)
+    bat_indices = np.arange(0, X.shape[-1], batch_size)
+    bat_indices = np.r_[bat_indices, X.shape[-1]]
+
+    X_tc_hrfed = []
+    for idx, bat_idx in enumerate(bat_indices[:-1]):
+        X_bat = X[:, bat_idx:bat_indices[idx+1]]
+        # generate X raw time course
+        X_tc = np.zeros((vol_t.max(), X_bat.shape[-1]), dtype=np.float32)
+        for i, onset in enumerate(onsets):
+            onset_start = int(onset * ops)
+            onset_end = int(onset_start + durations[i] * ops)
+            X_tc[onset_start:onset_end, :] = X_bat[i, :]
+
+        # convolve X raw time course with hrf kernal
+        fftconvolve(X_tc[:10], hrf[:2])  # to fix weird bug (probably some setting change) caused by running spm_hrf
+        X_tc_hrfed.append(fftconvolve(X_tc, hrf))
+        # print('hrf convolution: sample {0} to {1} finished'.format(bat_idx+1, bat_indices[idx+1]))
+
+    X_tc_hrfed = np.concatenate(X_tc_hrfed)
+
+    # downsample to volume frame
+    X_hrfed = X_tc_hrfed[vol_t, :]
+
+    return X_hrfed
