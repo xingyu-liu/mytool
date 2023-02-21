@@ -384,7 +384,7 @@ def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label
     else:
         mat_idx_map0 = cifti2.Cifti2MatrixIndicesMap([0], idx_type0, \
                 number_of_series_points=data.shape[0], series_exponent=1, \
-                    series_start=0, series_step=1, series_unit='second')
+                    series_start=0, series_step=1, series_unit='SECOND')
 
     # CIFTI_INDEX_TYPE_BRAIN_MODELS always corresponds to Cifti2Image.header.get_index_map(1),
     # and this index_map always contains some brain_structure information, such as brain_models and volume.
@@ -401,6 +401,24 @@ def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label
     img = cifti2.Cifti2Image(data, header)
 
     cifti2.save(img, file_path)
+
+
+def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
+    '''
+    save_col_name: the column name of the data in the df that is desired to
+        be saved.
+    mask: np.array data
+    bm: corresponding brain model data of the mask
+    scale: df must have the column indicating the scale. For scale='roi', 
+        the named column is 'roi_mask'.
+    '''
+
+    if scale == 'roi':
+        data2save = np.full(mask.shape, np.nan)
+        for _, roi in enumerate(df['roi_mask'].unique()):
+            data2save[mask==roi] = df.loc[df['roi_mask']==roi, save_col_name]
+
+        save2cifti(save_path, data2save[None,...], bm)
 
 
 def convolve_hrf(X, onsets, durations, n_vol, tr, ops=100):

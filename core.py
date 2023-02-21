@@ -167,29 +167,38 @@ def normalize(x, norm_range=[0,1]):
         
     return x
 
-def thr_IQR(x, times=3, series=False, exclude_zero=True):
-    """ 
-    if series is True, the last axis should be series 
-    """
-    
-    if series is False:
+def IQR_replace_outlier(x, times=3, replace_policy='nan'):
+    ''' 
+    x shape: [n_sample, n_series]
+    replace_policy: ['nan', 'IQR_bound', 'median']
+    '''
+
+    if np.ndim(x) ==  1:
         x = x[..., None]
 
-    if exclude_zero is True:
-        qu = np.asarray([np.nanquantile(x[..., i][x[..., i]!=0], 0.75) for i in range(x.shape[-1])])
-        ql = np.asarray([np.nanquantile(x[..., i][x[..., i]!=0], 0.25) for i in range(x.shape[-1])])
-    else:
-        qu = np.asarray([np.nanquantile(x[..., i], 0.75) for i in range(x.shape[-1])])
-        ql = np.asarray([np.nanquantile(x[..., i], 0.25) for i in range(x.shape[-1])])      
-        
-    x_post = copy.deepcopy(x)
-    x_post[x_post > (qu + times*(qu-ql))] = np.nan
-    x_post[x_post < (ql - times*(qu-ql))] = np.nan
+    iqr = stats.iqr(x, axis=0)
+    qu = stats.mstats.mquantiles(x, 0.75, axis=0)[0]
+    ql = stats.mstats.mquantiles(x, 0.25, axis=0)[0]
+
+    # upper bound
+    bu = qu + times*iqr
+    bl = ql - times*iqr
     
-    if series is False:
-        return x_post[...,0]
-    else:
-        return x_post
+    # replace
+    x_post = copy.deepcopy(x)
+    if replace_policy is 'nan':
+        x_post[x_post > bu] = np.nan
+        x_post[x_post < bl] = np.nan
+    elif replace_policy is 'IQR_bound':
+        for si in range(x_post.shape[-1]):
+            x_post[x_post[:,si] > bu[si], si] = bu[si]
+            x_post[x_post[:,si] < bl[si], si] = bl[si]
+    elif replace_policy is 'median':
+        for si in range(x_post.shape[-1]):
+            x_post[x_post[:,si] > bu[si], si] = np.median(x_post[:, si])
+            x_post[x_post[:,si] < bl[si], si] = np.median(x_post[:, si])
+    
+    return x_post
 
 
 def sparseness(x, type='s', norm=False):
@@ -303,32 +312,28 @@ def dendo_community(x):
     return sorted_x, sort_index
 
 
-def cluster(X, last_merge_number, cluster_number, label=None):
-    from time import time
+def cluster(X, cluster_number, label=None):
     from scipy.cluster import hierarchy
 
-    t0 = time()
     Z = hierarchy.linkage(X, method='ward')
-    print("%.2fs" % (time() - t0))
 
-    plt.figure(figsize=(8, 12))
+    plt.figure(figsize=(5, 8))
     hierarchy.dendrogram(Z, above_threshold_color='#bcbddc',labels=label,
                          orientation='right')
     plt.show()
 
-    # ---------- show last x merge -------------------------
-    plt.figure(figsize=(5, 8))
-    plt.title('Hierarchical Clustering Dendrogram (truncated)')
-    plt.ylabel('sample index or (cluster size)')
-    plt.xlabel('distance')
-    hierarchy.dendrogram(Z, truncate_mode='lastp',
-                         p=last_merge_number, orientation='right',
-                         leaf_font_size=12, show_contracted=True)
-    plt.show()
+    # # ---------- show last x merge -------------------------
+    # plt.figure(figsize=(2, 3))
+    # plt.title('Hierarchical Clustering Dendrogram (truncated)')
+    # plt.ylabel('sample index or (cluster size)')
+    # plt.xlabel('distance')
+    # hierarchy.dendrogram(Z, truncate_mode='lastp',
+    #                      p=last_merge_number, orientation='right',
+    #                      leaf_font_size=12, show_contracted=True)
+    # plt.show()
 
     # ------------pick the n biggist cluster--------------------
-    k = cluster_number
-    X_cluster = hierarchy.fcluster(Z, k, criterion='maxclust')
+    X_cluster = hierarchy.fcluster(Z, cluster_number, criterion='maxclust')
 
     return X_cluster
 
