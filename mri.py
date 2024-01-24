@@ -9,8 +9,27 @@ Created on Fri May 15 23:25:50 2020
 import numpy as np
 from nibabel.cifti2 import cifti2
 from scipy.signal import fftconvolve
-from nipy.modalities.fmri.hemodynamic_models import spm_hrf
+from scipy import ndimage
+# from nipy.modalities.fmri.hemodynamic_models import spm_hrf
 import copy
+
+# %% 
+def smooth_3dmri(func_data, func_mask, sigma=1, mode='reflect'):
+    # add a new axis if the data is 3d
+    if np.ndim(func_data) == 3:
+        func_data = func_data[..., np.newaxis]
+    
+    # apply mask
+    func_data[func_mask==0, :] = 0
+
+    # smooth considering the boundary effect
+    data_smoothed = ndimage.gaussian_filter(func_data, sigma=(sigma, sigma, sigma, 0), mode=mode)
+    normalization_mask =  ndimage.gaussian_filter((func_mask!=0).astype(float), sigma=sigma, mode=mode)
+    normalization_mask[normalization_mask == 0] = 1
+    data_smoothed /= normalization_mask[..., np.newaxis]
+
+    return np.squeeze(data_smoothed)
+
 
 def roiing_volume(roi_annot, data, method='nanmean', key=None):
 
@@ -287,7 +306,7 @@ class CiftiReader(object):
             Only returned when 'structure' is not None and zeroize is False.
         """
 
-        _data = np.array(self.full_data.get_data())
+        _data = np.array(self.full_data.get_fdata())
         if structure is not None:
             brain_model = self.brain_models([structure])[0]
             offset = brain_model.index_offset

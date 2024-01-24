@@ -16,7 +16,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms
 from scipy.stats import pearsonr
-from nipy.modalities.fmri.hemodynamic_models import compute_regressor
+# from nipy.modalities.fmri.hemodynamic_models import compute_regressor
 from dnnbrain.dnn import analyzer
 from dnnbrain.dnn import io as dnn_io
 from dnnbrain.brain import io as brain_io

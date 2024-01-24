@@ -6,7 +6,7 @@ This is a temporary script file.
 """
 
 import numpy as np
-from scipy import stats
+from scipy import stats, ndimage
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 import copy
@@ -48,7 +48,7 @@ def isc(data1, data2=None):
     return corr
 
 
-def isfc(data1, data2=None):
+def isfc(data1, data2=None, metric='correlation'):
     from scipy.spatial.distance import cdist
 
     """Cal functional connectivity between data1 and data2.
@@ -75,8 +75,8 @@ def isfc(data1, data2=None):
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
 
-    corr = np.nan_to_num(1 - cdist(data1, data2, metric='correlation'))
-    return corr
+    dist = np.nan_to_num(1 - cdist(data1, data2, metric=metric))
+    return dist
 
 
 def rdm(data):
@@ -186,14 +186,14 @@ def IQR_replace_outlier(x, times=3, replace_policy='nan'):
     
     # replace
     x_post = copy.deepcopy(x)
-    if replace_policy is 'nan':
+    if replace_policy == 'nan':
         x_post[x_post > bu] = np.nan
         x_post[x_post < bl] = np.nan
-    elif replace_policy is 'IQR_bound':
+    elif replace_policy == 'IQR_bound':
         for si in range(x_post.shape[-1]):
             x_post[x_post[:,si] > bu[si], si] = bu[si]
             x_post[x_post[:,si] < bl[si], si] = bl[si]
-    elif replace_policy is 'median':
+    elif replace_policy == 'median':
         for si in range(x_post.shape[-1]):
             x_post[x_post[:,si] > bu[si], si] = np.median(x_post[:, si])
             x_post[x_post[:,si] < bl[si], si] = np.median(x_post[:, si])
@@ -432,38 +432,49 @@ def rank(data, axis=0, order='descending'):
     return ranks
 
 
+def smooth_within_bounday(data, mask, sigma=1, mode='nearest'):
 
-def list_stats(x, method='mean', axis=None):
-    if method == 'mean':
-        return np.array([x[i].mean(axis) for i in range(len(x))])
-    elif method == 'max':
-        return np.array([x[i].max(axis) for i in range(len(x))])
-    elif method == 'min':
-        return np.array([x[i].min(axis) for i in range(len(x))])
-    elif method == 'median':
-        return np.array([np.median(x[i], axis) for i in range(len(x))])
-    elif method == 'std':
-        return np.array([x[i].std(axis) for i in range(len(x))])
-    elif method == 'mode':
-        return np.array([stats.mode(x[i])[0] for i in range(len(x))])
+    data_smoothed = ndimage.gaussian_filter(data, sigma=sigma, mode=mode)
+    normalization_mask =  ndimage.gaussian_filter((mask!=0).astype(float), sigma=sigma, mode=mode)
+    normalization_mask[normalization_mask == 0] = 1
+    data_smoothed /= normalization_mask
+    return data_smoothed
 
-    # ignore nan
-    elif method == 'nanmean':
-        return np.array([np.nanmean(x[i], axis) for i in range(len(x))])
-    elif method == 'nanmax':
-        return np.array([np.nanmax(x[i], axis) for i in range(len(x))])
-    elif method == 'nanmin':
-        return np.array([np.nanmin(x[i], axis) for i in range(len(x))])
-    elif method == 'nanmedian':
-        return np.array([np.nanmedian(x[i], axis) for i in range(len(x))])
-    elif method == 'nanstd':
-        return np.array([np.nanstd(x[i], axis) for i in range(len(x))])
-    elif method == 'nanmode':
-        return np.array([stats.mode(x[i], nan_policy='omit')[0] for i 
-                         in range(len(x))])
-    # not stats
-    elif method == 'size':
-        return np.array([x[i].size for i in range(len(x))])
+
+def sparse2dense(sparse_data, mag_value, freq=100):
+    '''
+    Convert sparse data to dense data in the original space.
+
+    Parameters:
+    - sparse_data (ndarray): Sparse data of shape (n_sample, m_coordinates). 
+        Make sure to set the coordinates type as integers if they are integers.
+    - mag_value (ndarray): Magnitude values of shape (n_sample).
+    - freq (int): Number of points to generate along each coordinate axis when the coordinates are not integers.
+        Default is 100.
+
+    Returns:
+    - dense_data (ndarray): Dense data in the original space.
+    - gridsmesh (list): List of meshgrid arrays representing the coordinate grids.
+
+    '''
+    
+    grids = []
+    for i in range(sparse_data.shape[1]):
+        if sparse_data.dtype == 'int':
+            grids.append(np.arange(sparse_data[:, i].min(), sparse_data[:, i].max()+1))
+        else:
+            grids.append(np.linspace(sparse_data[:, i].min(), sparse_data[:, i].max(), freq))
+
+    # Put sparse data back to the original space
+    dense_data = np.ones(np.concatenate([i.shape for i in grids])) * np.nan
+    if sparse_data.dtype == 'int':
+        dense_data[tuple(sparse_data.T)] = mag_value
+    else:
+        dense_data[tuple([np.argmin(np.abs(grids[i][:, np.newaxis] - sparse_data[:, i]), axis=0) \
+                        for i in range(sparse_data.shape[1])])] = mag_value
+    gridsmesh = np.meshgrid(*grids)
+
+    return dense_data, gridsmesh
 
 
 
