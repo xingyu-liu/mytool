@@ -4,14 +4,15 @@ Spyder Editor
 
 This is a temporary script file.
 """
-
+# %%
 import numpy as np
 from scipy import stats, ndimage
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 import copy
+from community import community_louvain
 
-
+# %%
 def isc(data1, data2=None):
 
     """calculate inter-subject correlation along the determined axis.
@@ -298,10 +299,9 @@ def rearrange_mat(x, rearrange_index):
 
 
 def dendo_community(x):
-    import community
 
     G = corr_matrix2graph(x)
-    dendo = community.generate_dendrogram(G)
+    dendo = community_louvain.generate_dendrogram(G)
     dendo_community = np.array([dendo[0][key] for key in dendo[0].keys()])
     sort_index = np.argsort(dendo_community)
 
