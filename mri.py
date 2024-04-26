@@ -5,14 +5,152 @@ Created on Fri May 15 23:25:50 2020
 
 @author: liuxingyu
 """
-
+import os
 import numpy as np
 from nibabel.cifti2 import cifti2
 from scipy.signal import fftconvolve
 from scipy import ndimage
 # from nipy.modalities.fmri.hemodynamic_models import spm_hrf
 import copy
+import nibabel as nib
+import subprocess
 
+# %%
+# io
+def load_mri_data(f_path, bs=None):
+    f_name = os.path.basename(f_path)
+    affine = None
+    header = None
+
+    if f_name.endswith('.nii.gz'):
+        data = nib.load(f_path).get_fdata()
+        affine = nib.load(f_path).affine
+        header = nib.load(f_path).header
+
+    elif f_name.endswith('.func.gii'):
+        data = nib.load(f_path).agg_data()
+
+    elif f_name.endswith('.annot'):
+        data = nib.freesurfer.read_annot(f_path)[0]
+    
+    # elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii'):
+    #     if bs is None:
+    #         bs = mytool.mri.CiftiReader(f_path).brain_structures
+    #     data = [mytool.mri.CiftiReader(f_path).get_data(structure=i)[0] for i in bs]
+    #     data = np.concatenate(data, axis=1).T        
+
+    return data, affine, header
+
+
+def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
+    f_name = os.path.basename(f_path)
+
+    if ref_f is not None:
+        affine = nib.load(ref_f).affine
+        header = nib.load(ref_f).header
+
+    if f_name.endswith('.nii.gz'):
+        img = nib.Nifti1Image(data, affine, header=header)
+        nib.save(img, f_path)
+
+    elif f_name.endswith('.func.gii'):
+        img = nib.gifti.GiftiImage()
+        img.add_gifti_data_array(nib.gifti.GiftiDataArray(data=data.astype(np.float32), intent='NIFTI_INTENT_NONE'))
+        img.to_filename(f_path)
+
+    print(f'data saved to {f_path}')
+
+
+def save_img_roiwise(atlas_data, atlas_data_f, roi_mask, value, save_f):
+    # atlas_data: 3d numpy array
+    # roi_mask: specify the roi_mask to save the value in the volume
+    # value: the value to save in the volume. shape: [n_roi, n_map], should match the order of roi_mask
+    # save_f: output volume (nii.gz) /surface file (func.gii)
+    atlas_data_sq = np.squeeze(atlas_data)
+
+    if np.ndim(atlas_data_sq) == 3:
+        if not save_f.endswith('.nii.gz'):
+            raise ValueError('output file should be in nii.gz format')
+    elif np.ndim(atlas_data_sq) == 1:
+        if not save_f.endswith('.func.gii'):
+            raise ValueError('output file should be in func.gii format')
+
+    if atlas_data_f is not None:
+        _, affine, header = load_mri_data(atlas_data_f)
+    else:
+        affine, header = np.eye(4), None
+
+    if np.ndim(value) == 1:
+        value = value[:, np.newaxis]
+
+    # put value back to the volume
+    sdata = np.ones(list(atlas_data_sq.shape) + [value.shape[1]]) * np.nan
+    for i, roi_maski in enumerate(roi_mask):
+        sdata[atlas_data_sq==roi_maski] = value[i]
+
+    # save the volume
+    save_mri_data(sdata, save_f, affine, header=header)
+    
+
+def save_img_inmask(mask_data, mask_data_f, value, save_f):
+    # mask_data: 3d numpy array
+    # value: the value to save in the volume. shape: [n_voxel, n_map]
+    # vol_f: output volume file
+    mask_data_sq = np.squeeze(mask_data)
+
+    if np.ndim(mask_data_sq) == 3:
+        data_type='vol'
+        if not save_f.endswith('.nii.gz'):
+            raise ValueError('vol output file should be in nii.gz format')
+    elif np.ndim(mask_data_sq) == 1:
+        data_type='surf'
+        if not save_f.endswith('.func.gii'):
+            raise ValueError('surf output file should be in func.gii format')
+
+    if mask_data_f is not None:
+        _, affine, header = load_mri_data(mask_data_f)
+    else:
+        affine, header = np.eye(4), None
+
+    if np.ndim(value) == 1:
+        value = value[:, np.newaxis]
+
+    # put value back to the volume
+    sdata = np.ones(list(mask_data.shape) + [value.shape[1]]) * np.nan
+    sdata[mask_data!=0] = value
+
+    # save the volume
+    save_mri_data(sdata, save_f, affine, header=header)
+
+
+def vol2surf(vol_f, surf_f, hemi, fs_dir, fs_sub):
+    # surf_f in 'func.gii' format if visualization using wb_view
+
+    env = os.environ.copy()
+    env['SUBJECTS_DIR'] = fs_dir
+
+    cmd = f'mri_vol2surf --mov {vol_f} --regheader {fs_sub} --hemi {hemi}' + \
+            f' --o {surf_f} --projfrac 0.5'
+    subprocess.run(f'zsh -c "source ~/.zshrc && {cmd}"', shell=True, env=env)
+
+def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
+    '''
+    save_col_name: the column name of the data in the df that is desired to
+        be saved.
+    mask: np.array data
+    bm: corresponding brain model data of the mask
+    scale: df must have the column indicating the scale. For scale='roi', 
+        the named column is 'roi_mask'.
+    '''
+
+    if scale == 'roi':
+        data2save = np.full(mask.shape, np.nan)
+        for _, roi in enumerate(df['roi_mask'].unique()):
+            data2save[mask==roi] = df.loc[df['roi_mask']==roi, save_col_name]
+
+        save2cifti(save_path, data2save[None,...], bm)
+
+        
 # %% 
 def smooth_3dmri(func_data, func_mask, sigma=1, mode='reflect'):
     # add a new axis if the data is 3d
@@ -420,24 +558,6 @@ def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label
     img = cifti2.Cifti2Image(data, header)
 
     cifti2.save(img, file_path)
-
-
-def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
-    '''
-    save_col_name: the column name of the data in the df that is desired to
-        be saved.
-    mask: np.array data
-    bm: corresponding brain model data of the mask
-    scale: df must have the column indicating the scale. For scale='roi', 
-        the named column is 'roi_mask'.
-    '''
-
-    if scale == 'roi':
-        data2save = np.full(mask.shape, np.nan)
-        for _, roi in enumerate(df['roi_mask'].unique()):
-            data2save[mask==roi] = df.loc[df['roi_mask']==roi, save_col_name]
-
-        save2cifti(save_path, data2save[None,...], bm)
 
 
 def convolve_hrf(X, onsets, durations, n_vol, tr, ops=100):
