@@ -522,4 +522,20 @@ def partial_corr(C):
         
     return P_corr
 
+# compute effective dimention given PCA explained variance
+def effective_dim(explained_variances, method='n2'):
+    """
+    Compute the effective dimensionality of a dataset based on the explained variances of its principal components.
+
+    :param explained_variances: Array of explained variances for each principal component.
+    :return: Effective dimensionality.
+    """
+    # Convert explained variances to proportions
+    proportions = explained_variances / np.sum(explained_variances)
+    if method == 'n1':
+        pass
+    elif method == 'n2':
+        effective_dim = proportions.sum()**2 / np.sum(proportions**2)
+
+    return effective_dim
     
