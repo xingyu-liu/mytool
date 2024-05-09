@@ -62,18 +62,11 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
 
 
 def save_img_roiwise(atlas_data, atlas_data_f, roi_mask, value, save_f):
-    # atlas_data: 3d numpy array
+    # atlas_data: 1d or 2d array, [n_roi, n_maps]
     # roi_mask: specify the roi_mask to save the value in the volume
     # value: the value to save in the volume. shape: [n_roi, n_map], should match the order of roi_mask
     # save_f: output volume (nii.gz) /surface file (func.gii)
     atlas_data_sq = np.squeeze(atlas_data)
-
-    if np.ndim(atlas_data_sq) == 3:
-        if not save_f.endswith('.nii.gz'):
-            raise ValueError('output file should be in nii.gz format')
-    elif np.ndim(atlas_data_sq) == 1:
-        if not save_f.endswith('.func.gii'):
-            raise ValueError('output file should be in func.gii format')
 
     if atlas_data_f is not None:
         _, affine, header = load_mri_data(atlas_data_f)
@@ -152,17 +145,21 @@ def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
 
         
 # %% 
-def smooth_3dmri(func_data, func_mask, sigma=1, mode='reflect'):
+def spatial_smooth_3d(input_data, mask, sigma=1, mode='reflect'):
+    '''smooth 3d mri data
+    input_data: 3d or 4d mri data
+    mask: mask for the data
+    '''
     # add a new axis if the data is 3d
-    if np.ndim(func_data) == 3:
-        func_data = func_data[..., np.newaxis]
+    if np.ndim(input_data) == 3:
+        input_data = input_data[..., np.newaxis]
     
     # apply mask
-    func_data[func_mask==0, :] = 0
+    input_data[mask==0, :] = 0
 
     # smooth considering the boundary effect
-    data_smoothed = ndimage.gaussian_filter(func_data, sigma=(sigma, sigma, sigma, 0), mode=mode)
-    normalization_mask =  ndimage.gaussian_filter((func_mask!=0).astype(float), sigma=sigma, mode=mode)
+    data_smoothed = ndimage.gaussian_filter(input_data, sigma=(sigma, sigma, sigma, 0), mode=mode)
+    normalization_mask =  ndimage.gaussian_filter((mask!=0).astype(float), sigma=sigma, mode=mode)
     normalization_mask[normalization_mask == 0] = 1
     data_smoothed /= normalization_mask[..., np.newaxis]
 
