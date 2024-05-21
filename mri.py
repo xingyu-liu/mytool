@@ -18,37 +18,66 @@ import subprocess
 # %%
 # io
 def load_mri_data(f_path, bs=None):
+    '''
+    f_path: file path
+    bs: brain structures, only for cifti file. Should be a list of strings.
+    '''
+    
     f_name = os.path.basename(f_path)
-    affine = None
-    header = None
 
     if f_name.endswith('.nii.gz'):
-        data = nib.load(f_path).get_fdata()
+        data_dict = nib.load(f_path).get_fdata()
         affine = nib.load(f_path).affine
         header = nib.load(f_path).header
 
+        return data_dict, affine, header
+
     elif f_name.endswith('.func.gii'):
-        data = nib.load(f_path).agg_data()
+        data_dict = nib.load(f_path).agg_data()
+
+        return data_dict, None, None
 
     elif f_name.endswith('.annot'):
-        data = nib.freesurfer.read_annot(f_path)[0]
+        data_dict = nib.freesurfer.read_annot(f_path)[0]
+
+        return data_dict, None, None
     
-    # elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii'):
-    #     if bs is None:
-    #         bs = mytool.mri.CiftiReader(f_path).brain_structures
-    #     data = [mytool.mri.CiftiReader(f_path).get_data(structure=i)[0] for i in bs]
-    #     data = np.concatenate(data, axis=1).T        
+    elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii') or f_name.endswith('.dlabel.nii'):
+        data_dict = {}
+        reader = CiftiReader(f_path)
 
-    return data, affine, header
+        data = reader.get_data()
+        if bs is not None:
+            data_dict['bs'] = bs
+            data_dict['bm'] = reader.brain_models(data_dict['bs'])
 
+            data_concat = []
+            for struci in data_dict['bs']:
+                brain_model = reader.brain_models([struci])[0]
+                offset = brain_model.index_offset
+                count = brain_model.index_count
+                data_concat.append(data[:, offset:offset+count])
+            data = np.concatenate(data_concat, axis=-1)
+        
+        else:
+            data_dict['bs'] = reader.brain_structures
+            data_dict['bm'] = reader.brain_models()
+
+        data_dict['data'] = data.T
+        data_dict['volume'] = reader.volume
+
+        return data_dict
 
 def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
+
     f_name = os.path.basename(f_path)
 
-    if ref_f is not None:
+    # get ref info
+    if ref_f is not None and os.path.basename(ref_f).endswith('.nii.gz'):
         affine = nib.load(ref_f).affine
         header = nib.load(ref_f).header
 
+    # save data
     if f_name.endswith('.nii.gz'):
         img = nib.Nifti1Image(data, affine, header=header)
         nib.save(img, f_path)
@@ -57,15 +86,33 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
         img = nib.gifti.GiftiImage()
         img.add_gifti_data_array(nib.gifti.GiftiDataArray(data=data.astype(np.float32), intent='NIFTI_INTENT_NONE'))
         img.to_filename(f_path)
+    
+    elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii'):
+        # if data is not a dict, raise error
+        if not isinstance(data, dict):
+            raise ValueError('data should be a dict, including data, bm, (volume)')
+
+        # make sure bm starts from 0 and concatenated correctly
+        data['bm'][0].index_offset = 0
+        if len(data['bm']) > 1:
+            for i in range(1, len(data['bm'])):
+                data['bm'][i].index_offset = data['bm'][i-1].index_offset + data['bm'][i-1].index_count
+        if 'volume' not in data.keys():
+            data['volume'] = None
+                    
+        save2cifti(f_name, data['data'], data['bm'], volume=data['volume'])
 
     print(f'data saved to {f_path}')
 
 
 def save_img_roiwise(atlas_data, atlas_data_f, roi_mask, value, save_f):
-    # atlas_data: 1d or 2d array, [n_roi, n_maps]
-    # roi_mask: specify the roi_mask to save the value in the volume
-    # value: the value to save in the volume. shape: [n_roi, n_map], should match the order of roi_mask
-    # save_f: output volume (nii.gz) /surface file (func.gii)
+    '''
+    atlas_data: 1d or 2d array, [n_roi, n_maps]
+    roi_mask: specify the roi_mask to save the value in the volume
+    value: the value to save in the volume. shape: [n_roi, n_map], should match the order of roi_mask
+    save_f: output volume (nii.gz) /surface file (func.gii)
+    '''
+
     atlas_data_sq = np.squeeze(atlas_data)
 
     if atlas_data_f is not None:
@@ -86,9 +133,12 @@ def save_img_roiwise(atlas_data, atlas_data_f, roi_mask, value, save_f):
     
 
 def save_img_inmask(mask_data, mask_data_f, value, save_f):
-    # mask_data: 3d numpy array
-    # value: the value to save in the volume. shape: [n_voxel, n_map]
-    # vol_f: output volume file
+    '''
+    mask_data: 3d numpy array
+    value: the value to save in the volume. shape: [n_voxel, n_map]
+    vol_f: output volume file
+    '''
+
     mask_data_sq = np.squeeze(mask_data)
 
     if np.ndim(mask_data_sq) == 3:
