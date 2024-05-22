@@ -100,7 +100,7 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
         if 'volume' not in data.keys():
             data['volume'] = None
                     
-        save2cifti(f_name, data['data'], data['bm'], volume=data['volume'])
+        save2cifti(f_path, data['data'], data['bm'], volume=data['volume'])
 
     print(f'data saved to {f_path}')
 
