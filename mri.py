@@ -32,13 +32,13 @@ def load_mri_data(f_path, bs=None):
 
         return data_dict, affine, header
 
-    elif f_name.endswith('.func.gii'):
+    elif f_name.endswith('.gii'):
         data_dict = nib.load(f_path).agg_data()
 
         return data_dict, None, None
 
     elif f_name.endswith('.annot'):
-        data_dict = nib.freesurfer.read_annot(f_path)[0]
+        data_dict = nib.freesurfer.read_annot(f_path)
 
         return data_dict, None, None
     
@@ -82,7 +82,7 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
         img = nib.Nifti1Image(data, affine, header=header)
         nib.save(img, f_path)
 
-    elif f_name.endswith('.func.gii'):
+    elif f_name.endswith('.gii'):
         img = nib.gifti.GiftiImage()
         img.add_gifti_data_array(nib.gifti.GiftiDataArray(data=data.astype(np.float32), intent='NIFTI_INTENT_NONE'))
         img.to_filename(f_path)
@@ -216,33 +216,67 @@ def spatial_smooth_3d(input_data, mask, sigma=1, mode='reflect'):
     return np.squeeze(data_smoothed)
 
 
-def roiing_volume(roi_annot, data, method='nanmean', key=None):
+def roi_describe(data, atlas_data, method='nanmean', key=None, skip_key0=True):
+    """
+    Get the ROI (Region of Interest) data based on the atlas data.
 
-    if key is not None:
-        roi_key = key
-    else:
-        roi_key = np.asarray(np.unique(roi_annot), dtype=np.int)
-        roi_key = roi_key[roi_key!=0]
+    Parameters:
+    - data: ndarray
+        The input data array. If it is a series, the last dimension represents maps.
+    - atlas_data: ndarray
+        The atlas data array, which should have the same shape as the data or one less dimension if data is a series.
+    - method: str, optional (default='nanmean')
+        The method to use for summarizing the ROI data. Options are:
+        'nanmean', 'nanmedian', 'nanstd', 'nanmax', 'nanmin', 'nansize'.
+    - key: array-like, optional
+        The key of the ROI. If None, the unique values of the atlas data are used.
+    - skip_key0: bool, optional (default=True)
+        Whether to skip the key with value 0.
+
+    Returns:
+    - tuple: (roi_data, key)
+        roi_data: ndarray
+            The summarized ROI data.
+        key: array-like
+            The keys corresponding to the ROIs.
+    """
+
+    # Ensure the dimensions of data and atlas_data are compatible
+    if np.ndim(data) != np.ndim(atlas_data):
+        if (np.ndim(data) != np.ndim(atlas_data) + 1) or (data.shape[:-1] != atlas_data.shape):
+            raise ValueError('The data should have the same shape as the atlas data '
+                             'or one less dimension if data is a series.')
+
+    atlas_data = atlas_data.astype(int)
     
+    if key is None:
+        key = np.unique(atlas_data)
+        if skip_key0:
+            key = key[key != 0]
+
+    methods = {
+        'nanmean': np.nanmean,
+        'nanmedian': np.nanmedian,
+        'nanstd': np.nanstd,
+        'nanmax': np.nanmax,
+        'nanmin': np.nanmin,
+        'nansize': lambda x, axis: np.sum(~np.isnan(x), axis)
+    }
+
+    if method not in methods:
+        raise ValueError(f"Invalid method '{method}'. Valid methods are: {list(methods.keys())}")
+
     roi_data = []
-    
-    for i in roi_key:
-        # ignore nan
-        if method == 'nanmean':
-            roi_data.append(np.nanmean(data[roi_annot==i], 0))
-        elif method == 'nanmedian':
-            roi_data.append(np.nanmedian(data[roi_annot==i], 0))  
-        elif method == 'nanstd':
-            roi_data.append(np.nanstd(data[roi_annot==i], 0))        
-        elif method == 'nanmax':
-            roi_data.append(np.nanmax(data[roi_annot==i], 0))
-        elif method == 'nanmin':
-            roi_data.append(np.nanmin(data[roi_annot==i], 0))
-        elif method == 'nansize':
-            roi_data.append(np.sum(~np.isnan(data[roi_annot==i])))
-    
+    for i in key:
+        data_i = data[atlas_data == i]
+        if data_i.size == 0:
+            roi_data_i = np.full(data.shape[-1], np.nan)
+        else:
+            roi_data_i = methods[method](data_i, axis=0)
+        roi_data.append(roi_data_i)
+
     roi_data = np.asarray(roi_data)
-    return roi_key, roi_data
+    return roi_data, key
 
 
 def get_n_ring_neighbor(faces, n=1, ordinal=False, mask=None):
