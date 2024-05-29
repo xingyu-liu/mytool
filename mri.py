@@ -105,7 +105,7 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
     print(f'data saved to {f_path}')
 
 
-def save_img_roiwise(atlas_data, atlas_data_f, roi_mask, value, save_f):
+def save_img_roiwise(value, key, atlas_data, save_f, atlas_data_f=None):
     '''
     atlas_data: 1d or 2d array, [n_roi, n_maps]
     roi_mask: specify the roi_mask to save the value in the volume
@@ -125,7 +125,7 @@ def save_img_roiwise(atlas_data, atlas_data_f, roi_mask, value, save_f):
 
     # put value back to the volume
     sdata = np.ones(list(atlas_data_sq.shape) + [value.shape[1]]) * np.nan
-    for i, roi_maski in enumerate(roi_mask):
+    for i, roi_maski in enumerate(key):
         sdata[atlas_data_sq==roi_maski] = value[i]
 
     # save the volume
