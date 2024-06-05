@@ -72,6 +72,10 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
 
     f_name = os.path.basename(f_path)
 
+    # if f_name doesn't end with .nii.gz, .gii, .dtseries.nii, .dscalar.nii, raise error
+    if not f_name.endswith(('.nii.gz', '.gii', '.dtseries.nii', '.dscalar.nii', '.dlabel.nii')):
+        raise ValueError('f_path should end with .nii.gz, .gii, .dtseries.nii, .dscalar.nii, .dlabel.nii')
+
     # get ref info
     if ref_f is not None and os.path.basename(ref_f).endswith('.nii.gz'):
         affine = nib.load(ref_f).affine

@@ -457,6 +457,9 @@ def sparse2dense(sparse_data, mag_value, freq=100):
     - gridsmesh (list): List of meshgrid arrays representing the coordinate grids.
 
     '''
+
+    # remove the offset of the coordinates
+    sparse_data = sparse_data - sparse_data.min(axis=0)
     
     grids = []
     for i in range(sparse_data.shape[1]):
@@ -538,4 +541,19 @@ def effective_dim(explained_variances, method='n2'):
         effective_dim = proportions.sum()**2 / np.sum(proportions**2)
 
     return effective_dim
+
+
+def crop_to_non_nan_region(array):
+    """
+    Crops the input array to the smallest region that contains all non-NaN values.
     
+    Parameters:
+        array (np.ndarray): Input array of any dimension.
+        
+    Returns:
+        np.ndarray: Cropped array.
+    """
+    valid_loc = np.where(~np.isnan(array))
+    slices = tuple(slice(np.min(dim), np.max(dim) + 1) for dim in valid_loc)
+
+    return array[slices]
