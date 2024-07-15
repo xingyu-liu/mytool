@@ -107,7 +107,7 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
         save2cifti(f_path, data['data'], data['bm'], volume=data['volume'])
 
     print(f'data saved to {f_path}')
-
+    
 
 def save_img_roiwise(value, key, atlas_data, save_f, atlas_data_f=None):
     '''
@@ -199,7 +199,7 @@ def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
 
         
 # %% 
-def spatial_smooth_3d(input_data, mask, sigma=1, mode='reflect'):
+def spatial_smooth_3d(input_data, mask=None, sigma=1, mode='reflect'):
     '''smooth 3d mri data
     input_data: 3d or 4d mri data
     mask: mask for the data
@@ -209,11 +209,13 @@ def spatial_smooth_3d(input_data, mask, sigma=1, mode='reflect'):
         input_data = input_data[..., np.newaxis]
     
     # apply mask
+    if mask is None:
+        mask = np.ones(input_data.shape[:-1])
     input_data[mask==0, :] = 0
 
     # smooth considering the boundary effect
     data_smoothed = ndimage.gaussian_filter(input_data, sigma=(sigma, sigma, sigma, 0), mode=mode)
-    normalization_mask =  ndimage.gaussian_filter((mask!=0).astype(float), sigma=sigma, mode=mode)
+    normalization_mask = ndimage.gaussian_filter((mask!=0).astype(float), sigma=sigma, mode=mode)
     normalization_mask[normalization_mask == 0] = 1
     data_smoothed /= normalization_mask[..., np.newaxis]
 

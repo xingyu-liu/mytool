@@ -4,11 +4,28 @@ Spyder Editor
 
 This is a temporary script file.
 """
-
+# %%
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import seaborn as sns
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+import plotly
+
+# %%
+
+def plotly_to_mpl(cmap_plotly):
+    colors = []
+    for color in cmap_plotly:
+        # Convert 'rgb(r, g, b)' to (r/255, g/255, b/255)
+        color = color.replace('rgb(', '').replace(')', '')
+        r, g, b = map(int, color.split(','))
+        colors.append((r / 255, g / 255, b / 255))
+
+    cmap_plt = LinearSegmentedColormap.from_list('', colors)
+
+    return cmap_plt
 
 
 # get_rgba
