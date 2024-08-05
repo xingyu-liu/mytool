@@ -49,7 +49,7 @@ def isc(data1, data2=None):
     return corr
 
 
-def isfc(data1, data2=None, metric='correlation'):
+def isfc(data1, data2=None, metric='correlation', rank_first=False):
     from scipy.spatial.distance import cdist
 
     """Cal functional connectivity between data1 and data2.
@@ -75,6 +75,10 @@ def isfc(data1, data2=None, metric='correlation'):
         data2 = data1
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
+
+    if rank_first:
+        data1 = stats.rankdata(data1, axis=-1)
+        data2 = stats.rankdata(data2, axis=-1)
 
     dist = np.nan_to_num(1 - cdist(data1, data2, metric=metric))
     return dist
