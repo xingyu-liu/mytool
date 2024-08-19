@@ -220,7 +220,6 @@ def gradient_color_hist(data, bin_num=10, fit=False, show_range=None,
                         rug=True, hist=False):
 
     """
-
     Parameters
     ----------
         data: list of 1-d data
@@ -241,3 +240,7 @@ def gradient_color_hist(data, bin_num=10, fit=False, show_range=None,
     if label is not None:
         ax.legend(label)
     plt.show()
+
+def cmyk_to_rgb(cmyk, cmyk_scale=1, rgb_scale=1):
+    rgb = [rgb_scale * (1 - cmyk[i] / float(cmyk_scale)) * (1 - cmyk[-1] / float(cmyk_scale)) for i in range(3)]
+    return np.array(rgb)
