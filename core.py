@@ -7,13 +7,14 @@ This is a temporary script file.
 # %%
 import numpy as np
 from scipy import stats, ndimage
-import matplotlib.pyplot as plt
+from scipy.spatial.distance import cdist
 from sklearn.preprocessing import MinMaxScaler
-import copy
 from community import community_louvain
+import copy
+import matplotlib.pyplot as plt
 
 # %%
-def isc(data1, data2=None):
+def isc(data1, data2=None, rank_first=False):
 
     """calculate inter-subject correlation along the determined axis.
 
@@ -38,19 +39,23 @@ def isc(data1, data2=None):
     """
 
     if data2 is None:
-        data2 = data1
+        data2 = copy.deepcopy(data1)
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
 
-    z_data1 = np.nan_to_num(stats.zscore(data1, axis=-1))
-    z_data2 = np.nan_to_num(stats.zscore(data2, axis=-1))
-    corr = np.sum(z_data1*z_data2, axis=-1)/(np.size(data1, -1))
+    if rank_first:
+        data1 = stats.rankdata(data1, axis=-1)
+        data2 = stats.rankdata(data2, axis=-1)
+
+    data1 = np.nan_to_num(stats.zscore(data1, axis=-1))
+    data2 = np.nan_to_num(stats.zscore(data2, axis=-1))
+
+    corr = np.sum(data1*data2, axis=-1) / np.sqrt(np.sum(data1**2, axis=-1)*np.sum(data2**2, axis=-1))
 
     return corr
 
 
-def isfc(data1, data2=None, metric='correlation', rank_first=False):
-    from scipy.spatial.distance import cdist
+def isfc(data1, data2=None, rank_first=False):
 
     """Cal functional connectivity between data1 and data2.
 
@@ -72,7 +77,7 @@ def isfc(data1, data2=None, metric='correlation', rank_first=False):
         2. n_features should be the same in data1 and data2.
     """
     if data2 is None:
-        data2 = data1
+        data2 = copy.deepcopy(data1)
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
 
@@ -80,7 +85,7 @@ def isfc(data1, data2=None, metric='correlation', rank_first=False):
         data1 = stats.rankdata(data1, axis=-1)
         data2 = stats.rankdata(data2, axis=-1)
 
-    dist = np.nan_to_num(1 - cdist(data1, data2, metric=metric))
+    dist = np.nan_to_num(1 - cdist(data1, data2, metric='correlation'))
     return dist
 
 
@@ -547,17 +552,47 @@ def effective_dim(explained_variances, method='n2'):
     return effective_dim
 
 
-def crop_to_non_nan_region(array):
+def crop_to_non_nan_region(data):
     """
     Crops the input array to the smallest region that contains all non-NaN values.
     
     Parameters:
-        array (np.ndarray): Input array of any dimension.
+        data (np.ndarray): Input array of any dimension.
         
     Returns:
-        np.ndarray: Cropped array.
+        cropped_array (np.ndarray): Cropped array.
+        slices (tuple): Slices that can be used to crop other arrays to the same region.
     """
-    valid_loc = np.where(~np.isnan(array))
+    valid_loc = np.where(~np.isnan(data))
     slices = tuple(slice(np.min(dim), np.max(dim) + 1) for dim in valid_loc)
 
-    return array[slices]
+    return data[slices], slices
+
+
+def pcorr(corr_mat):
+    '''
+    Calculate the partial correlation matrix from the correlation matrix.
+    
+    Parameters:
+    corr_mat (numpy.ndarray): Correlation matrix.
+    
+    Returns:
+    numpy.ndarray: Partial correlation matrix.
+    '''
+    # Calculate the inverse of the correlation matrix
+    inv_corr_mat = np.linalg.inv(corr_mat)
+    
+    # Initialize the partial correlation matrix
+    p_corr_mat = np.zeros_like(inv_corr_mat)
+    
+    # Calculate the partial correlations
+    for i in range(inv_corr_mat.shape[0]):
+        for j in range(inv_corr_mat.shape[1]):
+            if i != j:
+                # Off-diagonal elements: calculate partial correlations
+                p_corr_mat[i, j] = -inv_corr_mat[i, j] / np.sqrt(inv_corr_mat[i, i] * inv_corr_mat[j, j])
+            else:
+                # Diagonal elements should be 1
+                p_corr_mat[i, j] = 1
+                
+    return p_corr_mat
