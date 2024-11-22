@@ -569,7 +569,7 @@ def crop_to_non_nan_region(data):
     return data[slices], slices
 
 
-def pcorr(corr_mat):
+def partial_corr(corr_mat):
     '''
     Calculate the partial correlation matrix from the correlation matrix.
     
@@ -596,3 +596,40 @@ def pcorr(corr_mat):
                 p_corr_mat[i, j] = 1
                 
     return p_corr_mat
+
+
+def get_p_for_r(r, n):
+    """Calculate p-values for Pearson correlation coefficients.
+    
+    Parameters
+    ----------
+    r : float or numpy.ndarray
+        Correlation coefficient(s). Can be a single value or 1D array.
+    n : int
+        Sample size used to calculate the correlation(s). Must be > 2.
+        
+    Returns
+    -------
+    float or numpy.ndarray
+        P-value(s) corresponding to the correlation coefficient(s).
+        Returns same type as input (single value or array).
+        
+    Notes
+    -----
+    Uses Student's t-distribution to compute two-tailed p-values.
+    Formula: t = r * sqrt(n-2) / sqrt(1-r^2)
+    """
+    # Input validation
+    if n <= 2:
+        raise ValueError("Sample size (n) must be greater than 2")
+        
+    # Convert single value to array if needed
+    r_is_single = np.isscalar(r)
+    r = np.asarray(r)
+    
+    # Calculate p-values using t-distribution
+    t_stat = np.abs(r) * np.sqrt(n-2) / np.sqrt(1-r**2)
+    p = stats.t.sf(t_stat, n-2) * 2
+    
+    # Return same format as input
+    return p[0] if r_is_single else p
