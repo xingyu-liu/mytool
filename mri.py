@@ -728,3 +728,6 @@ def convolve_hrf(X, onsets, durations, n_vol, tr, ops=100):
     X_hrfed = X_tc_hrfed[vol_t, :]
 
     return X_hrfed
+
+
+

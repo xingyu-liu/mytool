@@ -489,51 +489,6 @@ def sparse2dense(sparse_data, mag_value, freq=100):
     return dense_data, gridsmesh
 
 
-
-def partial_corr(C):
-    
-    from scipy import linalg
-    """
-    Returns the sample linear partial correlation coefficients between pairs of variables in C, controlling 
-    for the remaining variables in C.
-
-    Author: Fabian Pedregosa-Izquierdo, f@bianp.net
-    Testing: Valentina Borghesani, valentinaborghesani@gmail.com
-    
-    Parameters
-    ----------
-    C : array-like, shape (n, p)
-        Array with the different variables. Each column of C is taken as a variable
-
-
-    Returns
-    -------
-    P : array-like, shape (p, p)
-        P[i, j] contains the partial correlation of C[:, i] and C[:, j] controlling
-        for the remaining variables in C.
-    """
-    
-    C = np.asarray(C)
-    p = C.shape[1]
-    P_corr = np.zeros((p, p), dtype=np.float)
-    for i in range(p):
-        P_corr[i, i] = 1
-        for j in range(i+1, p):
-            idx = np.ones(p, dtype=np.bool)
-            idx[i] = False
-            idx[j] = False
-            beta_i = linalg.lstsq(C[:, idx], C[:, j])[0]
-            beta_j = linalg.lstsq(C[:, idx], C[:, i])[0]
-
-            res_j = C[:, j] - C[:, idx].dot( beta_i)
-            res_i = C[:, i] - C[:, idx].dot(beta_j)
-            
-            corr = stats.pearsonr(res_i, res_j)[0]
-            P_corr[i, j] = corr
-            P_corr[j, i] = corr
-        
-    return P_corr
-
 # compute effective dimention given PCA explained variance
 def effective_dim(explained_variances, method='n2'):
     """
@@ -556,12 +511,14 @@ def crop_to_non_nan_region(data):
     """
     Crops the input array to the smallest region that contains all non-NaN values.
     
-    Parameters:
-        data (np.ndarray): Input array of any dimension.
+    Parameters
+    ----------
+    data (np.ndarray): Input array of any dimension.
         
-    Returns:
-        cropped_array (np.ndarray): Cropped array.
-        slices (tuple): Slices that can be used to crop other arrays to the same region.
+    Returns
+    -------
+    cropped_array (np.ndarray): Cropped array.
+    slices (tuple): Slices that can be used to crop other arrays to the same region.
     """
     valid_loc = np.where(~np.isnan(data))
     slices = tuple(slice(np.min(dim), np.max(dim) + 1) for dim in valid_loc)
@@ -569,14 +526,54 @@ def crop_to_non_nan_region(data):
     return data[slices], slices
 
 
+def dilate_mask(mask: np.ndarray, n_iter: int = 1) -> np.ndarray:
+    """Dilate each unique label in a mask by n iterations.
+    
+    Parameters
+    ----------
+    mask: Input nD array where each unique value represents a different region.
+        Background/unassigned voxels should be np.nan.
+    n_iter: Number of dilation iterations to perform. Each iteration expands
+        regions by one voxel in all directions.
+    
+    Returns
+    -------
+    np.ndarray: Array of shape (n_labels, *mask.shape) where each slice along
+        axis 0 contains the dilated mask for one label.
+    """
+    # Get unique labels, excluding NaN
+    labels = np.unique(mask)
+    labels = labels[~np.isnan(labels)]
+    
+    # Process each label separately
+    dilated_masks = []
+    for label in labels:
+        # Create binary mask for this label
+        binary_mask = (mask == label)
+        
+        # Perform dilation
+        dilated = binary_mask.copy()
+        for _ in range(n_iter):
+            dilated = ndimage.binary_dilation(dilated)
+            
+        # Convert back to label values
+        dilated = dilated.astype(int) * label
+        dilated_masks.append(dilated)
+    
+    # Stack all dilated masks
+    return np.stack(dilated_masks, axis=0)
+
+
 def partial_corr(corr_mat):
     '''
     Calculate the partial correlation matrix from the correlation matrix.
     
-    Parameters:
+    Parameters
+    ----------
     corr_mat (numpy.ndarray): Correlation matrix.
     
-    Returns:
+    Returns
+    -------
     numpy.ndarray: Partial correlation matrix.
     '''
     # Calculate the inverse of the correlation matrix
@@ -633,3 +630,4 @@ def get_p_for_r(r, n):
     
     # Return same format as input
     return p[0] if r_is_single else p
+
