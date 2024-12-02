@@ -631,3 +631,43 @@ def get_p_for_r(r, n):
     # Return same format as input
     return p[0] if r_is_single else p
 
+
+def calculate_dprime(data, reference_data):
+    """
+    Calculate d-prime sensitivity index between two datasets using vectorized operations.
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        Main data array (1D or 2D), shape = [n_sample, n_feature].
+    reference_data : np.ndarray
+        Reference data array (1D or 2D), shape = [n_sample, n_feature].
+        
+    Returns:
+    --------
+    np.ndarray
+        D-prime values with shape = [n_feature, ].
+    """
+    # Ensure 2D arrays
+    data_2d = np.atleast_2d(data)
+    reference_2d = np.atleast_2d(reference_data)
+    
+    # If input was 1D and converted to row vector, transpose to column vector
+    if data.ndim == 1:
+        data_2d = data_2d.T
+        reference_2d = reference_2d.T
+    
+    # Calculate means along samples axis (axis=0)
+    mean_diff = np.mean(data_2d, axis=0) - np.mean(reference_2d, axis=0)
+    
+    # Calculate pooled variance
+    pooled_var = (np.var(data_2d, axis=0) + np.var(reference_2d, axis=0)) / 2
+    
+    # Initialize dprime array with zeros
+    dprime = np.full(data_2d.shape[1], np.nan)
+    
+    # Calculate d-prime where variance is positive
+    mask = pooled_var > 0
+    dprime[mask] = mean_diff[mask] / np.sqrt(pooled_var[mask])
+    
+    return dprime
