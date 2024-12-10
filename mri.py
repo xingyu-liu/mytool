@@ -17,6 +17,20 @@ import subprocess
 
 # %%
 # io
+def determine_mri_cifti_type(f_path):
+    """
+    Determine if a file path corresponds to a CIFTI file format.
+    
+    Args:
+        f_path (str): Path to the file
+        
+    Returns:
+        bool: True if the file is a CIFTI format, False otherwise
+    """
+    cifti_extensions = ('.dscalar.nii', '.dlabel.nii', '.dtseries.nii')
+    return any(f_path.endswith(ext) for ext in cifti_extensions)
+
+
 def load_mri_data(f_path, bs=None):
     '''
     f_path: file path
@@ -68,7 +82,7 @@ def load_mri_data(f_path, bs=None):
 
         return data_dict
 
-def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
+def save_mri_data(data, f_path, affine=None, header=None, ref_f=None, print_f=False):
 
     f_name = os.path.basename(f_path)
 
@@ -106,7 +120,8 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None):
                     
         save2cifti(f_path, data['data'], data['bm'], volume=data['volume'])
 
-    print(f'data saved to {f_path}')
+    if print_f:
+        print(f'data saved to {f_path}')
     
 
 def save_img_roiwise(value, key, atlas_data, save_f, atlas_data_f=None):

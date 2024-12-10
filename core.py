@@ -55,7 +55,7 @@ def isc(data1, data2=None, rank_first=False):
     return corr
 
 
-def isfc(data1, data2=None, rank_first=False):
+def isfc(data1, data2=None, rank_first=False, metric='correlation'):
 
     """Cal functional connectivity between data1 and data2.
 
@@ -65,6 +65,8 @@ def isfc(data1, data2=None, rank_first=False):
             shape = [n_samples1, n_features].
         data2: used to calculate functional connectivity,
             shape = [n_samples2, n_features].
+        metric: 'correlation' or 'mahalanobis'. Be careful that if metric is other than correlation,
+            it returns the distance instead of the inverse of the distance.
 
     Returns
     -------
@@ -85,7 +87,11 @@ def isfc(data1, data2=None, rank_first=False):
         data1 = stats.rankdata(data1, axis=-1)
         data2 = stats.rankdata(data2, axis=-1)
 
-    dist = np.nan_to_num(1 - cdist(data1, data2, metric='correlation'))
+    if metric == 'correlation':
+        dist = np.nan_to_num(1 - cdist(data1, data2, metric=metric))
+    elif metric == 'mahalanobis':
+        dist = np.nan_to_num(cdist(data1, data2, metric=metric))
+
     return dist
 
 
@@ -129,7 +135,7 @@ def tSNR(data):
     return data_tSNR
 
 
-def d_prime(hits, misses, fas, crs):
+def calculate_dprime_categorical(hits, misses, fas, crs):
     # Floors an ceilings are replaced by half hits and half FA's
     half_hit = 0.5 / (hits + misses)[0, 0]
     half_fa = 0.5 / (fas + crs)[0, 0]
@@ -143,6 +149,63 @@ def d_prime(hits, misses, fas, crs):
     fa_rate[fa_rate==0] = half_fa
 
     return stats.norm.ppf(hit_rate) - stats.norm.ppf(fa_rate)
+
+
+def calculate_dprime(data, reference_data, method='parametric'):
+    """
+    Calculate d-prime sensitivity index between two datasets using vectorized operations.
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        Main data array (1D or 2D), shape = [n_sample, n_feature].
+    reference_data : np.ndarray
+        Reference data array (1D or 2D), shape = [n_sample, n_feature].
+    method : str
+        Method to calculate d-prime, 'parametric' or 'nonparametric'.
+        
+    Returns:
+    --------
+    np.ndarray
+        D-prime values with shape = [n_feature, ].
+    """
+    # Ensure 2D arrays
+    data_2d = np.atleast_2d(data)
+    reference_2d = np.atleast_2d(reference_data)
+    
+    # If input was 1D and converted to row vector, transpose to column vector
+    if data.ndim == 1:
+        data_2d = data_2d.T
+        reference_2d = reference_2d.T
+    
+    # calculate dprime
+    dprime = np.full(data_2d.shape[1], np.nan)
+    if method == 'parametric':
+        # Calculate means along samples axis (axis=0)
+        mean_diff = np.mean(data_2d, axis=0) - np.mean(reference_2d, axis=0)
+        
+        # Calculate pooled variance
+        pooled_var = (np.var(data_2d, axis=0) + np.var(reference_2d, axis=0)) / 2
+
+        # Calculate d-prime where variance is positive
+        mask = pooled_var > 0
+        dprime[mask] = mean_diff[mask] / np.sqrt(pooled_var[mask])
+
+    elif method == 'nonparametric':
+        # combine the 2 data and rank them together
+        combined_data = np.stack([data_2d, reference_2d], axis=0)
+        combined_data = combined_data.reshape(-1, combined_data.shape[-1])
+        combined_data = stats.rankdata(combined_data, axis=-1)
+        
+        # split the combined data back to 2 parts
+        data_2d_nonlin = combined_data[0:data_2d.shape[0], :]
+        reference_2d_nonlin = combined_data[data_2d.shape[0]:, :]
+        
+        # calculate dprime
+        dprime = (np.mean(data_2d_nonlin, axis=0) - np.mean(reference_2d_nonlin, axis=0)) \
+            / np.std(combined_data, axis=0)
+
+    return dprime
 
 
 def dice(x, y):
@@ -176,6 +239,7 @@ def normalize(x, norm_range=[0,1]):
         x = x[:, 0]
         
     return x
+
 
 def IQR_replace_outlier(x, times=3, replace_policy='nan'):
     ''' 
@@ -429,18 +493,6 @@ def local_extreme(x, condition):
     return extreme_loc
 
 
-def rank(data, axis=0, order='descending'):
-    if order == 'ascending':
-        order = data.argsort(axis)
-        ranks = order.argsort(axis)   
-
-    elif order == 'descending':
-        order = (data*-1).argsort(axis)
-        ranks = order.argsort(axis)
-
-    return ranks
-
-
 def smooth_within_bounday(data, mask, sigma=1, mode='nearest'):
 
     data_smoothed = ndimage.gaussian_filter(data, sigma=sigma, mode=mode)
@@ -630,44 +682,3 @@ def get_p_for_r(r, n):
     
     # Return same format as input
     return p[0] if r_is_single else p
-
-
-def calculate_dprime(data, reference_data):
-    """
-    Calculate d-prime sensitivity index between two datasets using vectorized operations.
-    
-    Parameters:
-    -----------
-    data : np.ndarray
-        Main data array (1D or 2D), shape = [n_sample, n_feature].
-    reference_data : np.ndarray
-        Reference data array (1D or 2D), shape = [n_sample, n_feature].
-        
-    Returns:
-    --------
-    np.ndarray
-        D-prime values with shape = [n_feature, ].
-    """
-    # Ensure 2D arrays
-    data_2d = np.atleast_2d(data)
-    reference_2d = np.atleast_2d(reference_data)
-    
-    # If input was 1D and converted to row vector, transpose to column vector
-    if data.ndim == 1:
-        data_2d = data_2d.T
-        reference_2d = reference_2d.T
-    
-    # Calculate means along samples axis (axis=0)
-    mean_diff = np.mean(data_2d, axis=0) - np.mean(reference_2d, axis=0)
-    
-    # Calculate pooled variance
-    pooled_var = (np.var(data_2d, axis=0) + np.var(reference_2d, axis=0)) / 2
-    
-    # Initialize dprime array with zeros
-    dprime = np.full(data_2d.shape[1], np.nan)
-    
-    # Calculate d-prime where variance is positive
-    mask = pooled_var > 0
-    dprime[mask] = mean_diff[mask] / np.sqrt(pooled_var[mask])
-    
-    return dprime
