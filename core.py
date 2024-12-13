@@ -860,7 +860,7 @@ def resample_image_within_mask(data_sparse, atlas_data_current, atlas_data_ref):
     data_resampled[atlas_data_current != 0] = data_sparse
     
     # Resample to reference space
-    data_upsampled = mytool.core.resample_image(
+    data_upsampled = resample_image(
         data_resampled, 
         atlas_data_current.shape, 
         atlas_data_ref.shape, 
