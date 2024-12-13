@@ -12,6 +12,12 @@ from sklearn.preprocessing import MinMaxScaler
 from community import community_louvain
 import copy
 import matplotlib.pyplot as plt
+import resource
+
+# %%
+def print_memory_usage():
+    # Get maximum resident set size (peak memory usage)
+    print(f'Memory usage: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024:.2f} GB')
 
 # %%
 def isc(data1, data2=None, rank_first=False):
@@ -50,7 +56,15 @@ def isc(data1, data2=None, rank_first=False):
     data1 = np.nan_to_num(stats.zscore(data1, axis=-1))
     data2 = np.nan_to_num(stats.zscore(data2, axis=-1))
 
-    corr = np.sum(data1*data2, axis=-1) / np.sqrt(np.sum(data1**2, axis=-1)*np.sum(data2**2, axis=-1))
+    # Calculate divisor
+    divisor = np.sqrt(np.sum(data1**2, axis=-1)*np.sum(data2**2, axis=-1))
+    nonzero_mask = divisor != 0
+
+    # Initialize correlation array with NaN values
+    corr = np.full_like(divisor, np.nan)
+    
+    # Calculate correlation only where divisor is not zero
+    corr[nonzero_mask] = np.sum(data1*data2, axis=-1)[nonzero_mask] / divisor[nonzero_mask]
 
     return corr
 
@@ -169,14 +183,15 @@ def calculate_dprime(data, reference_data, method='parametric'):
     np.ndarray
         D-prime values with shape = [n_feature, ].
     """
+
     # Ensure 2D arrays
-    data_2d = np.atleast_2d(data)
-    reference_2d = np.atleast_2d(reference_data)
+    if np.ndim(data) == 1:
+        data = data[..., np.newaxis]
+    if np.ndim(reference_data) == 1:
+        reference_data = reference_data[..., np.newaxis]
     
-    # If input was 1D and converted to row vector, transpose to column vector
-    if data.ndim == 1:
-        data_2d = data_2d.T
-        reference_2d = reference_2d.T
+    data_2d = data
+    reference_2d = reference_data
     
     # calculate dprime
     dprime = np.full(data_2d.shape[1], np.nan)
@@ -193,9 +208,8 @@ def calculate_dprime(data, reference_data, method='parametric'):
 
     elif method == 'nonparametric':
         # combine the 2 data and rank them together
-        combined_data = np.stack([data_2d, reference_2d], axis=0)
-        combined_data = combined_data.reshape(-1, combined_data.shape[-1])
-        combined_data = stats.rankdata(combined_data, axis=-1)
+        combined_data = np.vstack([data_2d, reference_2d])
+        combined_data = stats.rankdata(combined_data, axis=0)
         
         # split the combined data back to 2 parts
         data_2d_nonlin = combined_data[0:data_2d.shape[0], :]
@@ -682,3 +696,185 @@ def get_p_for_r(r, n):
     
     # Return same format as input
     return p[0] if r_is_single else p
+
+# %%
+# image processing
+
+def fill_nan_with_nearest(data, ndim_account_nan):
+    '''
+    Fill NaN values with the nearest valid values using Euclidean distance transform.
+    
+    Parameters
+    ----------
+    data : ndarray
+        Input array containing NaN values. The array can have N dimensions,
+        where the first ndim_account_nan dimensions are used for NaN detection
+        and filling.
+    ndim_account_nan : int
+        Number of leading dimensions to consider for NaN detection and filling.
+        For example, if data is 4D and ndim_account_nan=3, only the first 3
+        dimensions will be used to compute distances to nearest non-NaN values.
+        
+    Returns
+    -------
+    ndarray
+        Array of same shape as input with NaN values replaced by nearest valid values.
+        The filling is based on the Euclidean distances in the specified dimensions.
+
+    '''
+
+    # Validate inputs
+    if not isinstance(ndim_account_nan, int) or ndim_account_nan < 1:
+        raise ValueError("ndim_account_nan must be a positive integer")
+    if ndim_account_nan > data.ndim:
+        raise ValueError("ndim_account_nan cannot exceed data dimensions")
+
+    # Create slice for the dimensions to consider for NaN detection
+    nan_slice = tuple(slice(None) if i < ndim_account_nan else 0 
+                     for i in range(data.ndim))
+    
+    # Create NaN mask for the specified dimensions
+    nan_mask = np.isnan(data[nan_slice])
+    nan_locations = np.where(nan_mask)
+    
+    # Compute distances and indices to nearest non-NaN values
+    _, indices = ndimage.distance_transform_edt(
+        nan_mask, 
+        return_distances=True, 
+        return_indices=True
+    )
+    
+    # Get values from nearest non-NaN locations
+    filled_arr = data[tuple(indices[i][nan_locations] 
+                          for i in range(ndim_account_nan))]
+    
+    # Create output array and fill NaN values
+    data_filled = np.copy(data)
+    data_filled[nan_mask] = filled_arr
+    
+    return data_filled
+
+
+def resample_image(data, source_shape, ref_shape, order=1, mode='nearest'):
+    '''
+    Upsample data from source space to reference space using scipy's zoom function.
+    
+    Parameters
+    ----------
+    data : ndarray
+        Input array to upsample. The number of dimensions must be >= len(source_shape).
+        Additional dimensions beyond source_shape will be preserved with zoom factor 1.
+    source_shape : tuple or array-like
+        The shape of the source space. Must have same length as ref_shape.
+    ref_shape : tuple or array-like
+        The target shape for upsampling. Must have same length as source_shape.
+    order : int, default=1
+        The order of the interpolation
+    mode : str, default='nearest'
+        How to handle edges. Options: 'nearest', 'mirror', 'reflect', 'wrap'
+
+    Returns
+    -------
+    ndarray
+        Upsampled array with shape matching ref_shape in the first dimensions
+        and preserving any additional dimensions from the input data
+        
+    Raises
+    ------
+    ValueError
+        If source_shape and ref_shape have different lengths
+        If data has fewer dimensions than source_shape
+    '''
+
+    # the source_shape and ref_shape must have the same ndim
+    if len(source_shape) != len(ref_shape):
+        raise ValueError('the source_shape and ref_shape must have the same ndim')
+
+    if data.ndim < len(source_shape):
+        raise ValueError(f'Input data dimensions ({data.ndim}) cannot be less '
+                        f'than source_shape dimensions ({len(source_shape)})')
+
+
+    # Fill NaN values with nearest valid values
+    data_filled = fill_nan_with_nearest(data, ndim_account_nan=len(source_shape))
+
+    # Calculate zoom factors for each spatial dimension
+    zoom_factors = np.array(ref_shape) / np.array(source_shape)
+    
+    # Add factor of 1 for feature dimension
+    zoom_factors = np.append(zoom_factors, np.ones(data.ndim - len(source_shape)))
+
+    # Perform upsampling
+    data_resampled = ndimage.zoom(data_filled, zoom_factors, order=order, mode=mode)
+
+    return data_resampled
+
+
+def resample_image_within_mask(data_sparse, atlas_data_current, atlas_data_ref):
+    '''
+    Resample data vector from source atlas space to reference atlas space while preserving masking.
+    
+    Parameters
+    ----------
+    data_sparse : ndarray
+        Data vector to resample. Can be 1D (n_voxels,) or 2D (n_voxels, n_features).
+        Must have same number of voxels as non-zero elements in atlas_data_source.
+    atlas_data_current : ndarray
+        Source atlas data of shape (x, y, z). Non-zero values indicate valid voxels.
+    atlas_data_ref : ndarray 
+        Reference atlas data of shape (x, y, z). Non-zero values indicate valid voxels.
+        
+    Returns
+    -------
+    ndarray
+        Resampled data vector in reference space. Will maintain input dimensionality:
+        - If input was 1D: shape (n_ref_voxels,)
+        - If input was 2D: shape (n_ref_voxels, n_features)
+        where n_ref_voxels is the number of non-zero voxels in atlas_data_ref.
+        
+    Raises
+    ------
+    ValueError
+        If data_sparse shape doesn't match number of non-zero voxels in atlas_data_source.
+    '''
+    # Input validation
+    n_source_voxels = np.sum(atlas_data_current != 0)
+    if data_sparse.shape[0] != n_source_voxels:
+        raise ValueError(
+            f"data_sparse has {data_sparse.shape[0]} rows but atlas_data_source has "
+            f"{n_source_voxels} non-zero voxels"
+        )
+    
+    # Track original dimensionality
+    is_2d = data_sparse.ndim == 2
+    if not is_2d:
+        data_sparse = data_sparse[..., np.newaxis]
+    
+    # Initialize volume with NaNs
+    data_resampled = np.full(
+        tuple(atlas_data_current.shape) + (data_sparse.shape[1],), 
+        np.nan
+    )
+    
+    # Map data to source space volume
+    data_resampled[atlas_data_current != 0] = data_sparse
+    
+    # Resample to reference space
+    data_upsampled = mytool.core.resample_image(
+        data_resampled, 
+        atlas_data_current.shape, 
+        atlas_data_ref.shape, 
+        order=1
+    )
+    
+    # Apply reference space mask
+    data_upsampled[atlas_data_ref == 0] = np.nan
+    
+    # Extract valid voxels
+    data_upsampled_vec = data_upsampled[atlas_data_ref != 0]
+    
+    # Restore original dimensionality if input was 1D
+    if not is_2d:
+        data_upsampled_vec = data_upsampled_vec[:, 0]
+        
+    return data_upsampled_vec

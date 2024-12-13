@@ -5,6 +5,7 @@ Created on Fri May 15 23:25:50 2020
 
 @author: liuxingyu
 """
+# %%
 import os
 import numpy as np
 from nibabel.cifti2 import cifti2
@@ -662,87 +663,188 @@ def save2cifti(file_path, data, brain_models, map_names=None, volume=None, label
     cifti2.save(img, file_path)
 
 
-def convolve_hrf(X, onsets, durations, n_vol, tr, ops=100):
-    """
-    Convolve each X's column iteratively with HRF and align with the timeline of BOLD signal
+# def convolve_hrf(X, onsets, durations, n_vol, tr, ops=100):
+#     """
+#     Convolve each X's column iteratively with HRF and align with the timeline of BOLD signal
+#     Parameters
+#     ----------
+#     X : array
+#         Shape = n_event or [n_event, n_condition]
+#     onsets : array_like
+#         In sec. size = n_event
+#     durations : array_like
+#         In sec. size = n_event
+#     n_vol : int
+#         The number of volumes of BOLD signal
+#     tr : float
+#         Repeat time in second
+#     ops : int
+#         Oversampling number per second, must be one of the (10, 100, 1000)
+
+#     Returns
+#     -------
+#     X_hrfed : array
+#         The result after convolution and alignment
+#         shape = n_vol or [n_event, n_vol]
+#     """
+
+#     if np.ndim(X) == 1:
+#         X = X[..., None]
+#     assert np.ndim(X) == 2, 'X must be a 1D or 2D array'
+
+#     assert X.shape[0] == onsets.shape[0] and X.shape[0] == durations.shape[0], \
+#         'The length of onsets and durations should be matched with the number of events.'
+#     assert ops in (10, 100, 1000), 'Oversampling rate must be one of the (10, 100, 1000)!'
+
+#     # unify the precision
+#     decimals = int(np.log10(ops))
+#     onsets = np.round(np.asarray(onsets), decimals=decimals)
+#     durations = np.round(np.asarray(durations), decimals=decimals)
+#     tr = np.round(tr, decimals=decimals)
+    
+#     assert onsets.min() >= 0, 'The onsets must be non-negative'
+#     if onsets.min() > 0:
+#         # The earliest event's onset is later than the start point of response.
+#         # We supplement it with zero-value event to align with the response.
+#         X = np.insert(X, 0, np.zeros(X.shape[1]), 0)
+#         durations = np.insert(durations, 0, onsets.min(), 0)
+#         onsets = np.insert(onsets, 0, 0, 0)
+
+#     # compute volume acquisition timing
+#     vol_t = (np.arange(n_vol) * tr * ops).astype(int)  
+
+#     # # generate hrf kernel
+#     hrf = np.array(spm_hrf(tr, oversampling=tr*ops))
+#     hrf = hrf[..., None]
+#     # hrf = np.load('mytool/hrf.npy') 
+
+#     # do convolution in batches for trade-off between speed and memory
+#     batch_size = int(100000 / ops)
+#     bat_indices = np.arange(0, X.shape[-1], batch_size)
+#     bat_indices = np.r_[bat_indices, X.shape[-1]]
+
+#     X_tc_hrfed = []
+#     for idx, bat_idx in enumerate(bat_indices[:-1]):
+#         X_bat = X[:, bat_idx:bat_indices[idx+1]]
+#         # generate X raw time course
+#         X_tc = np.zeros((vol_t.max(), X_bat.shape[-1]), dtype=np.float32)
+#         for i, onset in enumerate(onsets):
+#             onset_start = int(onset * ops)
+#             onset_end = int(onset_start + durations[i] * ops)
+#             X_tc[onset_start:onset_end, :] = X_bat[i, :]
+
+#         # convolve X raw time course with hrf kernal
+#         fftconvolve(X_tc[:10], hrf[:2])  # to fix weird bug (probably some setting change) caused by running spm_hrf
+#         X_tc_hrfed.append(fftconvolve(X_tc, hrf))
+#         # print('hrf convolution: sample {0} to {1} finished'.format(bat_idx+1, bat_indices[idx+1]))
+
+#     X_tc_hrfed = np.concatenate(X_tc_hrfed)
+
+#     # downsample to volume frame
+#     X_hrfed = X_tc_hrfed[vol_t, :]
+
+#     return X_hrfed
+
+def transform_to_another_space(source_f, ref_f, xfm_list, output_f, 
+                               interpolate_method='NearestNeighbor', load_output=False):
+    '''Transform dense 3D/4D brain data from one space to another using ANTs.
+
     Parameters
     ----------
-    X : array
-        Shape = n_event or [n_event, n_condition]
-    onsets : array_like
-        In sec. size = n_event
-    durations : array_like
-        In sec. size = n_event
-    n_vol : int
-        The number of volumes of BOLD signal
-    tr : float
-        Repeat time in second
-    ops : int
-        Oversampling number per second, must be one of the (10, 100, 1000)
+    source_f : str
+        Path to the input image file to be transformed
+    ref_f : str
+        Path to the reference image that defines the output space
+    xfm_list : list
+        List of transformation files. Each element can be either:
+        - str: path to transformation file
+        - list/tuple: (path, bool) where bool indicates whether to invert transform
+    output_f : str
+        Path where the transformed image will be saved
+    load_output : bool, optional
+        If True, loads and returns the transformed data, by default False
 
     Returns
     -------
-    X_hrfed : array
-        The result after convolution and alignment
-        shape = n_vol or [n_event, n_vol]
-    """
+    numpy.ndarray, optional
+        Transformed image data if load_output=True
 
-    if np.ndim(X) == 1:
-        X = X[..., None]
-    assert np.ndim(X) == 2, 'X must be a 1D or 2D array'
+    Notes
+    -----
+    Uses ANTs' antsApplyTransforms tool to perform the transformation. The function
+    assumes ANTs is installed and accessible in the system path.
+    '''
 
-    assert X.shape[0] == onsets.shape[0] and X.shape[0] == durations.shape[0], \
-        'The length of onsets and durations should be matched with the number of events.'
-    assert ops in (10, 100, 1000), 'Oversampling rate must be one of the (10, 100, 1000)!'
+    # stitch the xfm_list into a single string
+    xfm_str = [f'-t {i} ' for i in xfm_list]
+    xfm_str = ''.join(xfm_str)[:-1].replace("'", "")  
 
-    # unify the precision
-    decimals = int(np.log10(ops))
-    onsets = np.round(np.asarray(onsets), decimals=decimals)
-    durations = np.round(np.asarray(durations), decimals=decimals)
-    tr = np.round(tr, decimals=decimals)
+    # Apply transformation
+    cmd = f'antsApplyTransforms -d 3 -e 3 -i {source_f} -r {ref_f} -o {output_f} {xfm_str} -n {interpolate_method}'
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     
-    assert onsets.min() >= 0, 'The onsets must be non-negative'
-    if onsets.min() > 0:
-        # The earliest event's onset is later than the start point of response.
-        # We supplement it with zero-value event to align with the response.
-        X = np.insert(X, 0, np.zeros(X.shape[1]), 0)
-        durations = np.insert(durations, 0, onsets.min(), 0)
-        onsets = np.insert(onsets, 0, 0, 0)
+    if result.returncode != 0:
+        raise RuntimeError(f"Transformation failed: {result.stderr}")
 
-    # compute volume acquisition timing
-    vol_t = (np.arange(n_vol) * tr * ops).astype(int)  
+    # Load and return transformed data if requested
+    if load_output:
+        try:
+            data_transformed = load_mri_data(output_f)[0]
+            return data_transformed
+        except Exception as e:
+            raise RuntimeError(f"Failed to load transformed data: {str(e)}")
+    
 
-    # # generate hrf kernel
-    hrf = np.array(spm_hrf(tr, oversampling=tr*ops))
-    hrf = hrf[..., None]
-    # hrf = np.load('mytool/hrf.npy') 
+def transform_sparse_to_another_space(data_sparse, 
+                                      atlas_current, atlas_current_f, atlas_ref, atlas_ref_f, 
+                                      xfm_list, output_f):
+    """Transform sparse ROI data from one space to another.
+    
+    Args:
+        data_sparse (np.ndarray): ROI data in 2D space [n_voxel, n_feature] or 1D [n_voxel]
+        atlas_source (Atlas): Atlas object containing source space information
+        atlas_target (Atlas): Atlas object containing target space information  
+        roi_mask_key (int/list): Key value(s) identifying ROI mask region(s)
+        target_f (str): Path to target space template file
+        xfm_list (list): List of transformation matrix files and whether to apply inverse transformation
+            e.g. [[xfm_path1, 1], [xfm_path2, 0]], where 1 means apply inverse transformation, 0 means apply forward transformation
+        temp_f (str): Path for temporary file storage
+    
+    Returns:
+        np.ndarray: Transformed data in target space [n_voxel, n_feature] or [n_voxel]
+    """
+    # Input validation
+    if not isinstance(data_sparse, np.ndarray):
+        raise ValueError("data_sparse must be a numpy array")
 
-    # do convolution in batches for trade-off between speed and memory
-    batch_size = int(100000 / ops)
-    bat_indices = np.arange(0, X.shape[-1], batch_size)
-    bat_indices = np.r_[bat_indices, X.shape[-1]]
+    # Handle input dimensions
+    is_2d = len(data_sparse.shape) == 2
+    if not is_2d:
+        if len(data_sparse.shape) != 1:
+            raise ValueError("data_sparse must be 1D or 2D array")
+        data_sparse = data_sparse[..., np.newaxis]
 
-    X_tc_hrfed = []
-    for idx, bat_idx in enumerate(bat_indices[:-1]):
-        X_bat = X[:, bat_idx:bat_indices[idx+1]]
-        # generate X raw time course
-        X_tc = np.zeros((vol_t.max(), X_bat.shape[-1]), dtype=np.float32)
-        for i, onset in enumerate(onsets):
-            onset_start = int(onset * ops)
-            onset_end = int(onset_start + durations[i] * ops)
-            X_tc[onset_start:onset_end, :] = X_bat[i, :]
+    # Convert sparse to dense 3D representation
+    data_dense = np.full(list(atlas_current.shape) + [data_sparse.shape[1]], np.nan)
+    data_dense[atlas_current != 0] = data_sparse
 
-        # convolve X raw time course with hrf kernal
-        fftconvolve(X_tc[:10], hrf[:2])  # to fix weird bug (probably some setting change) caused by running spm_hrf
-        X_tc_hrfed.append(fftconvolve(X_tc, hrf))
-        # print('hrf convolution: sample {0} to {1} finished'.format(bat_idx+1, bat_indices[idx+1]))
+    temp_f = output_f.replace('.nii.gz', '_temp.nii.gz')
+    save_mri_data(data_dense, temp_f, ref_f=atlas_current_f)
 
-    X_tc_hrfed = np.concatenate(X_tc_hrfed)
+    # Transform dense data
+    data_transformed = transform_to_another_space(
+        source_f=temp_f, 
+        ref_f=atlas_ref_f,
+        xfm_list=xfm_list,
+        output_f=output_f, 
+        interpolate_method='NearestNeighbor', load_output=True)
 
-    # downsample to volume frame
-    X_hrfed = X_tc_hrfed[vol_t, :]
+    # Convert back to sparse representation
+    data_transformed_sparse = data_transformed[atlas_ref != 0, :]
 
-    return X_hrfed
+    # Return appropriate dimensionality
+    if not is_2d:
+        data_transformed_sparse = data_transformed_sparse[:, 0]
 
-
+    return data_transformed_sparse
 
