@@ -14,100 +14,155 @@ import copy
 import matplotlib.pyplot as plt
 import resource
 
+from typing import Optional, Literal
+from numpy.typing import NDArray
+
 # %%
 def print_memory_usage():
     # Get maximum resident set size (peak memory usage)
     print(f'Memory usage: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024:.2f} GB')
 
 # %%
-def isc(data1, data2=None, rank_first=False):
-
-    """calculate inter-subject correlation along the determined axis.
+def isc(data1: NDArray[np.float_], 
+        data2: Optional[NDArray[np.float_]] = None, 
+        rank_first: bool = False) -> NDArray[np.float_]:
+    """Calculate inter-subject correlation along the determined axis.
 
     Parameters
     ----------
-
-        data1: used to calculate functional connectivity,
-            shape = [n_samples, n_features].
-        data2: used to calculate functional connectivity,
-            shape = [n_samples, n_features].
+    data1 : numpy.ndarray
+        Used to calculate functional connectivity, shape = [n_samples, n_features].
+    data2 : numpy.ndarray, optional
+        Used to calculate functional connectivity, shape = [n_samples, n_features].
+        If None, will use a copy of data1. Default is None.
+    rank_first : bool, optional
+        Whether to apply rank transformation before correlation. Default is False.
 
     Returns
     -------
-        isc: point-to-point functional connectivity list of
-            data1 and data2, shape = [n_samples, ].
+    corr : numpy.ndarray
+        Point-to-point functional connectivity list of data1 and data2, 
+        shape = [n_samples,].
 
     Notes
     -----
-        1. data1 and data2 should both be 2-dimensional.
-        2. [n_samples, n_features] should be the same in data1 and data2.
+    1. n_features should be the same in data1 and data2.
 
     """
-
+    # Copy data2 if None
     if data2 is None:
         data2 = copy.deepcopy(data1)
+
+    # Convert NaN to 0
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
 
+    # Ensure 2D arrays
+    if np.ndim(data1) == 1:
+        data1 = data1[np.newaxis, ...]
+    if np.ndim(data2) == 1:
+        data2 = data2[np.newaxis, ...]
+
+    # Validate input dimensions
+    if data1.shape != data2.shape:
+        raise ValueError(f"Input shapes must match. Got {data1.shape} and {data2.shape}")
+
+    # Apply rank transformation if requested
     if rank_first:
         data1 = stats.rankdata(data1, axis=-1)
         data2 = stats.rankdata(data2, axis=-1)
 
+    # Z-score the data
     data1 = np.nan_to_num(stats.zscore(data1, axis=-1))
     data2 = np.nan_to_num(stats.zscore(data2, axis=-1))
 
-    # Calculate divisor
-    divisor = np.sqrt(np.sum(data1**2, axis=-1)*np.sum(data2**2, axis=-1))
+    # Calculate correlations
+    divisor = np.sqrt(np.sum(data1**2, axis=-1) * np.sum(data2**2, axis=-1))
     nonzero_mask = divisor != 0
 
     # Initialize correlation array with NaN values
     corr = np.full_like(divisor, np.nan)
     
     # Calculate correlation only where divisor is not zero
-    corr[nonzero_mask] = np.sum(data1*data2, axis=-1)[nonzero_mask] / divisor[nonzero_mask]
+    corr[nonzero_mask] = np.sum(data1 * data2, axis=-1)[nonzero_mask] / divisor[nonzero_mask]
 
     return corr
 
 
-def isfc(data1, data2=None, rank_first=False, metric='correlation'):
-
-    """Cal functional connectivity between data1 and data2.
+def isfc(data1: NDArray[np.float_], 
+         data2: Optional[NDArray[np.float_]] = None, 
+         rank_first: bool = False,
+         metric: Literal['correlation'] = 'correlation') -> NDArray[np.float_]:
+    """Calculate inter-subject functional connectivity between two datasets.
 
     Parameters
     ----------
-        data1: used to calculate functional connectivity,
-            shape = [n_samples1, n_features].
-        data2: used to calculate functional connectivity,
-            shape = [n_samples2, n_features].
-        metric: 'correlation' or 'mahalanobis'. Be careful that if metric is other than correlation,
-            it returns the distance instead of the inverse of the distance.
+    data1 : numpy.ndarray
+        First dataset used to calculate functional connectivity,
+        shape = [n_samples1, n_features] or [n_samples1].
+    data2 : numpy.ndarray, optional
+        Second dataset used to calculate functional connectivity,
+        shape = [n_samples2, n_features] or [n_samples2].
+        If None, will use a copy of data1. Default is None.
+    rank_first : bool, optional
+        Whether to apply rank transformation before computing connectivity.
+        Default is False.
+    metric : {'correlation'}, optional
+        Distance metric to use. Currently only 'correlation' is supported.
+        Returns similarity (1 - distance) for correlation metric.
+        Default is 'correlation'.
 
     Returns
     -------
-        isfc: functional connectivity map of data1 and data2,
-            shape = [n_samples1, n_samples2].
+    dist : numpy.ndarray
+        Functional connectivity matrix between data1 and data2,
+        shape = [n_samples1, n_samples2].
+        For correlation metric, higher values indicate stronger connectivity.
 
     Notes
     -----
-        1. data1 and data2 should both be 2-dimensional.
-        2. n_features should be the same in data1 and data2.
+    1. Input arrays are automatically converted to 2D if 1D.
+    2. NaN values are converted to 0 before computation.
+    3. For correlation metric, output is transformed to similarity (1 - distance).
+
+    Raises
+    ------
+    ValueError
+        If metric is not 'correlation' or if feature dimensions don't match.
     """
+    # Validate metric
+    if metric != 'correlation':
+        raise ValueError("Only 'correlation' metric is currently supported")
+
+    # Handle data2=None case
     if data2 is None:
         data2 = copy.deepcopy(data1)
+    
+    # Convert NaN to 0
     data1 = np.nan_to_num(data1)
     data2 = np.nan_to_num(data2)
 
+    # Ensure 2D arrays
+    if np.ndim(data1) == 1:
+        data1 = data1[np.newaxis, ...]
+    if np.ndim(data2) == 1:
+        data2 = data2[np.newaxis, ...]
+
+    # Validate dimensions
+    if data1.shape[1] != data2.shape[1]:
+        raise ValueError(
+            f"Feature dimensions must match. Got {data1.shape[1]} and {data2.shape[1]}"
+        )
+
+    # Apply rank transformation if requested
     if rank_first:
         data1 = stats.rankdata(data1, axis=-1)
         data2 = stats.rankdata(data2, axis=-1)
 
-    if metric == 'correlation':
-        dist = np.nan_to_num(1 - cdist(data1, data2, metric=metric))
-    elif metric == 'mahalanobis':
-        dist = np.nan_to_num(cdist(data1, data2, metric=metric))
+    # Compute connectivity
+    dist = np.nan_to_num(1 - cdist(data1, data2, metric=metric))
 
     return dist
-
 
 def rdm(data):
     """Cal representaion similarity matrix.
