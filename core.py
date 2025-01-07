@@ -270,9 +270,11 @@ def calculate_dprime(data, reference_data, method='parametric'):
         data_2d_nonlin = combined_data[0:data_2d.shape[0], :]
         reference_2d_nonlin = combined_data[data_2d.shape[0]:, :]
         
-        # calculate dprime
-        dprime = (np.mean(data_2d_nonlin, axis=0) - np.mean(reference_2d_nonlin, axis=0)) \
-            / np.std(combined_data, axis=0)
+        # calculate dprime with zero division check
+        std = np.std(combined_data, axis=0)
+        mask = std > 0  # identify non-zero standard deviations
+        dprime[mask] = (np.mean(data_2d_nonlin[:, mask], axis=0) - 
+                       np.mean(reference_2d_nonlin[:, mask], axis=0)) / std[mask]
 
     return dprime
 
