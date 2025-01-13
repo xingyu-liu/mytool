@@ -573,43 +573,88 @@ def smooth_within_bounday(data, mask, sigma=1, mode='nearest'):
     return data_smoothed
 
 
-def sparse2dense(sparse_data, mag_value, freq=100):
-    '''
-    Convert sparse data to dense data in the original space.
+def sparse2dense(data_sparse, dense_mask=None, coord=None, remove_offset=True, freq=100):
+    """Convert sparse data to dense data in the original space.
 
-    Parameters:
-    - sparse_data (ndarray): Sparse data of shape (n_sample, m_coordinates). 
-        Make sure to set the coordinates type as integers if they are integers.
-    - mag_value (ndarray): Magnitude values of shape (n_sample).
-    - freq (int): Number of points to generate along each coordinate axis when the coordinates are not integers.
+    Parameters
+    ----------
+    data_sparse : ndarray
+        Sparse data of shape (n_sample, n_feature) or (n_sample,).
+    coord : ndarray
+        Coordinates of shape (n_sample, m_coordinates).
+        Should be integers for discrete coordinates.
+    dense_mask : ndarray, optional
+        Dense mask with ndim = coord.shape[1]. If provided, output will match mask shape.
+    freq : int, optional
+        Number of points to generate along each coordinate axis for non-integer coordinates.
         Default is 100.
 
-    Returns:
-    - dense_data (ndarray): Dense data in the original space.
-    - gridsmesh (list): List of meshgrid arrays representing the coordinate grids.
+    Returns
+    -------
+    ndarray
+        Dense data array. Shape depends on inputs:
+        - With dense_mask: same shape as mask + (n_feature,) if data is 2D
+        - Without dense_mask: shape determined by coordinate ranges + (n_feature,) if data is 2D
 
-    '''
+    Notes
+    -----
+    For integer coordinates, values are placed exactly at specified positions.
+    For float coordinates, values are placed at nearest grid points based on freq.
+    """
 
-    # remove the offset of the coordinates
-    sparse_data = sparse_data - sparse_data.min(axis=0)
-    
-    grids = []
-    for i in range(sparse_data.shape[1]):
-        if sparse_data.dtype == 'int':
-            grids.append(np.arange(sparse_data[:, i].min(), sparse_data[:, i].max()+1))
-        else:
-            grids.append(np.linspace(sparse_data[:, i].min(), sparse_data[:, i].max(), freq))
+    # one of dense_mask and coord must be provided and the other is None
+    if dense_mask is None and coord is None:
+        raise ValueError("either dense_mask or coord must be provided")
 
-    # Put sparse data back to the original space
-    dense_data = np.ones(np.concatenate([i.shape for i in grids])) * np.nan
-    if sparse_data.dtype == 'int':
-        dense_data[tuple(sparse_data.T)] = mag_value
+    # Handle input dimensions
+    is_2d = len(data_sparse.shape) == 2
+    if not is_2d:
+        if len(data_sparse.shape) != 1:
+            raise ValueError("data_sparse must be 1D or 2D array")
+        data_sparse = data_sparse[..., np.newaxis]
+        # print(data_sparse.shape)
+
+    if dense_mask is not None:
+        # Use mask to define output shape
+        output_shape = dense_mask.shape + (data_sparse.shape[1],)
+        data_dense = np.full(output_shape, np.nan)
+        data_dense[dense_mask != 0] = data_sparse
     else:
-        dense_data[tuple([np.argmin(np.abs(grids[i][:, np.newaxis] - sparse_data[:, i]), axis=0) \
-                        for i in range(sparse_data.shape[1])])] = mag_value
-    gridsmesh = np.meshgrid(*grids)
+        # reconstruct dense data from coord
+        if remove_offset:
+            # Normalize coordinates to start from 0
+            coord -= coord.min(axis=0)
+        
+        # Create coordinate grids
+        grids = []
+        for i in range(coord.shape[1]):
+            if coord.dtype == 'int':
+                grids.append(np.arange(coord[:, i].min(), coord[:, i].max() + 1))
+            else:
+                grids.append(np.linspace(coord[:, i].min(), coord[:, i].max(), freq))
 
-    return dense_data, gridsmesh
+        dense_mask = np.zeros(tuple(len(g) for g in grids), dtype=int)
+        dense_mask[tuple(coord.T)] = 1
+
+        # Initialize dense array
+        output_shape = dense_mask.shape + (data_sparse.shape[1],)
+        data_dense = np.full(output_shape, np.nan)
+        # print(data_dense.shape)
+
+        # Map sparse data to dense array
+        if coord.dtype == 'int':
+            data_dense[tuple(coord.T)] = data_sparse
+        else:
+            # Find nearest grid points for float coordinates
+            grid_indices = [np.argmin(np.abs(grids[i][:, np.newaxis] - coord[:, i]), axis=0) 
+                          for i in range(coord.shape[1])]
+            data_dense[tuple(grid_indices)] = data_sparse
+
+    # Restore original dimensionality if input was 1D
+    if not is_2d:
+        data_dense = data_dense[..., 0]
+
+    return data_dense, dense_mask
 
 
 # compute effective dimention given PCA explained variance
@@ -757,7 +802,7 @@ def get_p_for_r(r, n):
 # %%
 # image processing
 
-def fill_nan_with_nearest(data, ndim_account_nan):
+def fill_nan_with_nearest(data, ndim_account_nan=None):
     '''
     Fill NaN values with the nearest valid values using Euclidean distance transform.
     
@@ -781,10 +826,13 @@ def fill_nan_with_nearest(data, ndim_account_nan):
     '''
 
     # Validate inputs
-    if not isinstance(ndim_account_nan, int) or ndim_account_nan < 1:
-        raise ValueError("ndim_account_nan must be a positive integer")
-    if ndim_account_nan > data.ndim:
-        raise ValueError("ndim_account_nan cannot exceed data dimensions")
+    if ndim_account_nan is None:
+        ndim_account_nan = data.ndim
+    else:
+        if not isinstance(ndim_account_nan, int) or ndim_account_nan < 1:
+            raise ValueError("ndim_account_nan must be a positive integer")
+        if ndim_account_nan > data.ndim:
+            raise ValueError("ndim_account_nan cannot exceed data dimensions")
 
     # Create slice for the dimensions to consider for NaN detection
     nan_slice = tuple(slice(None) if i < ndim_account_nan else 0 
@@ -935,3 +983,72 @@ def resample_image_within_mask(data_sparse, atlas_data_current, atlas_data_ref):
         data_upsampled_vec = data_upsampled_vec[:, 0]
         
     return data_upsampled_vec
+
+
+def calculate_laplacian_regularity(data, mask: Optional[np.ndarray] = None) -> float:
+    """Calculate the Laplacian regularity of an N-dimensional scalar field.
+    
+    Parameters
+    ----------
+    data : ndarray
+        N-dimensional array containing scalar values
+    mask : ndarray of bool, optional
+        Boolean mask indicating valid data points. If None, will use ~np.isnan(data)
+        
+    Returns
+    -------
+    float
+        Laplacian regularity measure (lower values indicate smoother fields)
+        
+    Notes
+    -----
+    The Laplacian is calculated using finite differences. For an N-dimensional field,
+    each point's Laplacian is the sum of its second derivatives along each dimension.
+    The regularity measure is the mean squared Laplacian over all valid points.
+    """
+    if mask is None:
+        mask = ~np.isnan(data)
+    
+    # Validate input
+    if data.shape != mask.shape:
+        raise ValueError("Data and mask must have the same shape")
+        
+    # Initialize Laplacian array with same shape as input
+    laplacian = np.zeros_like(data, dtype=np.float64)  # Ensure float64 for precision
+    n_dims = data.ndim
+    
+    # Calculate second derivatives along each dimension
+    for dim in range(n_dims):
+        # Create slices for central difference
+        slices_before = [slice(None)] * n_dims
+        slices_before[dim] = slice(None, -2)
+        
+        slices_center = [slice(None)] * n_dims
+        slices_center[dim] = slice(1, -1)
+        
+        slices_after = [slice(None)] * n_dims
+        slices_after[dim] = slice(2, None)
+        
+        # Add second derivative along this dimension
+        laplacian[tuple(slices_center)] += (
+            data[tuple(slices_before)] + 
+            data[tuple(slices_after)] - 
+            2 * data[tuple(slices_center)]
+        )
+    
+    # Get valid interior points (where Laplacian is defined)
+    interior_mask = mask.copy()
+    for dim in range(n_dims):
+        slices = [slice(None)] * n_dims
+        slices[dim] = slice(1, -1)
+        interior_mask = interior_mask[tuple(slices)]
+    
+    # Handle case where no valid points exist
+    if not np.any(interior_mask):
+        return np.nan
+        
+    # Calculate regularity as mean squared Laplacian
+    regularity = np.nanmean(laplacian[interior_mask]**2)
+    
+    return regularity
+

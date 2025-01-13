@@ -15,6 +15,7 @@ from scipy import ndimage
 import copy
 import nibabel as nib
 import subprocess
+import mytool
 
 # %%
 # io
@@ -793,19 +794,18 @@ def transform_to_another_space(source_f, ref_f, xfm_list, output_f,
             return data_transformed
         except Exception as e:
             raise RuntimeError(f"Failed to load transformed data: {str(e)}")
-    
 
 def transform_sparse_to_another_space(data_sparse, 
-                                      atlas_current, atlas_current_f, atlas_ref, atlas_ref_f, 
+                                      dense_mask_current, dense_mask_current_f, dense_mask_ref, dense_mask_ref_f, 
                                       xfm_list, output_f):
     """Transform sparse ROI data from one space to another.
     
     Args:
         data_sparse (np.ndarray): ROI data in 2D space [n_voxel, n_feature] or 1D [n_voxel]
-        atlas_source (Atlas): Atlas object containing source space information
-        atlas_target (Atlas): Atlas object containing target space information  
-        roi_mask_key (int/list): Key value(s) identifying ROI mask region(s)
-        target_f (str): Path to target space template file
+        dense_mask_current (np.ndarray): Dense mask in 3D space
+        dense_mask_current_f (str): Path to dense mask file in source space
+        dense_mask_ref (np.ndarray): Dense mask in 3D space [n_voxel]
+        dense_mask_ref_f (str): Path to dense mask file in target space
         xfm_list (list): List of transformation matrix files and whether to apply inverse transformation
             e.g. [[xfm_path1, 1], [xfm_path2, 0]], where 1 means apply inverse transformation, 0 means apply forward transformation
         temp_f (str): Path for temporary file storage
@@ -825,22 +825,21 @@ def transform_sparse_to_another_space(data_sparse,
         data_sparse = data_sparse[..., np.newaxis]
 
     # Convert sparse to dense 3D representation
-    data_dense = np.full(list(atlas_current.shape) + [data_sparse.shape[1]], np.nan)
-    data_dense[atlas_current != 0] = data_sparse
+    data_dense = mytool.core.sparse2dense(data_sparse, dense_mask=dense_mask_current)
 
     temp_f = output_f.replace('.nii.gz', '_temp.nii.gz')
-    save_mri_data(data_dense, temp_f, ref_f=atlas_current_f)
+    save_mri_data(data_dense, temp_f, ref_f=dense_mask_current_f)
 
     # Transform dense data
     data_transformed = transform_to_another_space(
         source_f=temp_f, 
-        ref_f=atlas_ref_f,
+        ref_f=dense_mask_ref_f,
         xfm_list=xfm_list,
         output_f=output_f, 
         interpolate_method='NearestNeighbor', load_output=True)
 
     # Convert back to sparse representation
-    data_transformed_sparse = data_transformed[atlas_ref != 0, :]
+    data_transformed_sparse = data_transformed[dense_mask_ref != 0, :]
 
     # Return appropriate dimensionality
     if not is_2d:
