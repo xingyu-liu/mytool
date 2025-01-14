@@ -564,7 +564,9 @@ def local_extreme(x, condition):
     return extreme_loc
 
 
-def smooth_within_bounday(data, mask, sigma=1, mode='nearest'):
+def smooth_within_bounday(data, mask=None, sigma=1, mode='nearest'):
+    if mask is None:
+        mask = np.ones_like(data)
 
     data_smoothed = ndimage.gaussian_filter(data, sigma=sigma, mode=mode)
     normalization_mask =  ndimage.gaussian_filter((mask!=0).astype(float), sigma=sigma, mode=mode)
@@ -634,7 +636,7 @@ def sparse2dense(data_sparse, dense_mask=None, coord=None, remove_offset=True, f
                 grids.append(np.linspace(coord[:, i].min(), coord[:, i].max(), freq))
 
         dense_mask = np.zeros(tuple(len(g) for g in grids), dtype=int)
-        dense_mask[tuple(coord.T)] = 1
+        # dense_mask[tuple(coord.T)] = 1
 
         # Initialize dense array
         output_shape = dense_mask.shape + (data_sparse.shape[1],)
@@ -649,6 +651,8 @@ def sparse2dense(data_sparse, dense_mask=None, coord=None, remove_offset=True, f
             grid_indices = [np.argmin(np.abs(grids[i][:, np.newaxis] - coord[:, i]), axis=0) 
                           for i in range(coord.shape[1])]
             data_dense[tuple(grid_indices)] = data_sparse
+        
+        dense_mask[~np.isnan(data_dense[..., 0])] = 1
 
     # Restore original dimensionality if input was 1D
     if not is_2d:
