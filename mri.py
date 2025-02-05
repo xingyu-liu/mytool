@@ -222,7 +222,7 @@ def spatial_smooth_3d(input_data, mask=None, sigma=1, mode='reflect'):
     mask: mask for the data
     '''
     # add a new axis if the data is 3d
-    if np.ndim(input_data) == 3:
+    if np.ndim(input_data) == np.ndim(mask):
         input_data = input_data[..., np.newaxis]
     
     # apply mask
@@ -283,7 +283,7 @@ def roi_describe(data, atlas_data, method='nanmean', key=None, skip_key0=True):
         'nanstd': np.nanstd,
         'nanmax': np.nanmax,
         'nanmin': np.nanmin,
-        'nansize': lambda x, axis: np.sum(~np.isnan(x), axis)
+        'nancount': lambda x, axis: np.sum(~np.isnan(x), axis)
     }
 
     if method not in methods:

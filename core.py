@@ -919,7 +919,7 @@ def resample_image(data, source_shape, ref_shape, order=1, mode='nearest'):
     return data_resampled
 
 
-def resample_image_within_mask(data_sparse, atlas_data_current, atlas_data_ref):
+def resample_image_within_mask(data_sparse, atlas_data_current, atlas_data_ref, order=1, mode='nearest'):
     '''
     Resample data vector from source atlas space to reference atlas space while preserving masking.
     
@@ -973,7 +973,7 @@ def resample_image_within_mask(data_sparse, atlas_data_current, atlas_data_ref):
         data_resampled, 
         atlas_data_current.shape, 
         atlas_data_ref.shape, 
-        order=1
+        order=order, mode=mode
     )
     
     # Apply reference space mask
