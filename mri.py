@@ -818,14 +818,14 @@ def transform_sparse_to_another_space(data_sparse,
         raise ValueError("data_sparse must be a numpy array")
 
     # Handle input dimensions
-    is_2d = len(data_sparse.shape) == 2
+    is_2d = data_sparse.ndim == 2
     if not is_2d:
-        if len(data_sparse.shape) != 1:
+        if data_sparse.ndim != 1:
             raise ValueError("data_sparse must be 1D or 2D array")
         data_sparse = data_sparse[..., np.newaxis]
 
     # Convert sparse to dense 3D representation
-    data_dense = mytool.core.sparse2dense(data_sparse, dense_mask=dense_mask_current)
+    data_dense, _ = mytool.core.sparse2dense(data_sparse, dense_mask=dense_mask_current)
 
     temp_f = output_f.replace('.nii.gz', '_temp.nii.gz')
     save_mri_data(data_dense, temp_f, ref_f=dense_mask_current_f)
