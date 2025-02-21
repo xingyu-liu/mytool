@@ -12,6 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import plotly
+import pandas as pd
 
 # %%
 
@@ -64,3 +65,38 @@ def blend_cmap(x, y, cmap1='Purples', cmap2='Greens', norm_xy=True):
     blended_cmap = LinearSegmentedColormap.from_list('blended', blended_colors, N=len(blended_colors))
 
     return blended_colors, blended_cmap
+
+# %% 
+def get_cmap_atlas(atlas, hemi='rh', info_f=None):
+    if atlas not in ['MMP', 'RSN7nw', 'RSN17nw', 'mesulam']:
+        raise ValueError('atlas should be either MMP or RSN7nw')
+    
+    if atlas == 'MMP':
+        if info_f is None:
+            info_f = '/home/star/github/atlas/MMP/atlas-MMP_roiinfo.txt'
+        atlas_info = pd.read_csv(info_f, sep='\t')
+
+        colors = [tuple(int(i)/255 for i in j[1:-1].split()) for j in 
+            atlas_info.loc[atlas_info['hemi']==hemi, 'color'].values]
+        
+    if atlas in ['RSN7nw', 'RSN17nw']:
+        if info_f is None:
+            info_f = f'/home/star/github/atlas/RSN/atlas-{atlas}_roiinfo.txt'
+        atlas_info = pd.read_csv(info_f, sep='\t')
+    
+        colors = [tuple(int(i)/255 for i in j[1:-1].split()) for j in 
+            atlas_info['color'].values]
+    
+    if atlas == 'mesulam':
+        if info_f is None:
+            info_f = '/home/star/github/atlas/mesulam/atlas-mesulam_roiinfo.txt'
+        atlas_info = pd.read_csv(info_f, sep='\t')
+        colors = [tuple(int(i)/255 for i in j[1:-1].split()) for j in 
+            atlas_info['color'].values]
+
+    # repalce the above with np.clip
+    colors = np.array([tuple(np.clip(i, 0.001, 0.999) for i in j) for j in colors])
+
+    cmap = plt.cm.colors.ListedColormap(colors)
+
+    return cmap, colors, atlas_info
