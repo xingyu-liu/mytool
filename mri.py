@@ -930,24 +930,31 @@ def spin_permutation_voxel(coords, max_iterations=50):
             # Sample a subset of positions to try as shift targets (for efficiency)
             n_samples = min(len(remaining_positions), 10)
             sample_indices = np.random.choice(len(remaining_pos_array), n_samples, replace=False)
+            sample_targets = remaining_pos_array[sample_indices]
             
-            for base_idx in range(min(5, len(remaining_transformed))):
-                base_pos = remaining_transformed[base_idx]
-                for target_pos in remaining_pos_array[sample_indices]:
-                    shift_vector = target_pos - base_pos
+            # Convert remaining_positions to numpy array for faster lookups
+            remaining_pos_set = set(map(tuple, remaining_pos_array))
+            
+            # Use vectorized operations for shift calculations
+            base_positions = remaining_transformed[:min(5, len(remaining_transformed))]
+            for base_pos in base_positions:
+                # Calculate all shift vectors at once
+                shift_vectors = sample_targets - base_pos
+                
+                # Apply each shift vector to all remaining points
+                for shift_vector in shift_vectors:
                     shifted = remaining_transformed + shift_vector
                     
-                    # Count matches using vectorized operations
-                    matches = sum(1 for coord in shifted if tuple(coord) in remaining_positions)
+                    # Vectorized matching count
+                    matches = sum(tuple(coord) in remaining_pos_set for coord in shifted)
                     
                     if matches > max_matches:
                         max_matches = matches
                         best_shift = shift_vector
-            
+
             # Apply best shift if found
             if best_shift is not None and max_matches > 0:
-                for idx in remaining_indices:
-                    transformed_coords[idx] += best_shift
+                transformed_coords[remaining_idx_array] += best_shift
                 progress_made = True
         
         if not progress_made:
