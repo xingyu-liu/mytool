@@ -847,3 +847,125 @@ def transform_sparse_to_another_space(data_sparse,
 
     return data_transformed_sparse
 
+def spin_permutation_voxel(coords, max_iterations=50):
+    """
+    Performs spin permutation on voxels in n-dimensional space, preserving spatial frequency.
+    The function performs a shift and rotation, but rotations are constrained to n_dim × 2 orientations
+    (positive or negative along each dimension).
+    
+    Parameters
+    ----------
+    coords : numpy.ndarray
+        Array of shape [n_voxel, n_dim] representing voxel coordinates in n-dimensional space
+    max_iterations : int, optional
+        Maximum number of iterations to attempt matching all voxels, by default 50
+    
+    Returns
+    -------
+    numpy.ndarray
+        Array of shape [n_voxel] representing new voxel IDs after permutation
+    
+    Raises
+    ------
+    ValueError
+        If unable to assign all voxels or if resulting permutation is invalid
+    """
+    n_voxel, n_dim = coords.shape
+    coords = coords.astype(int)  # Ensure integer coordinates
+    
+    # Step 1: Initial transformation
+    # Random shift by selecting a new origin
+    origin_idx = np.random.randint(0, n_voxel)
+    shift_vector = coords[0] - coords[origin_idx]
+    shifted_coords = coords + shift_vector
+    
+    # Random rotation via dimension permutation and sign flips
+    dim_permutation = np.random.permutation(n_dim)
+    flip_signs = np.random.choice([-1, 1], size=n_dim)
+    transformed_coords = shifted_coords[:, dim_permutation] * flip_signs
+    
+    # Step 2: Initialize tracking sets and mappings
+    original_pos_set = {tuple(coord) for coord in coords}
+    id_mapping = {}
+    remaining_indices = set(range(n_voxel))
+    remaining_positions = original_pos_set.copy()
+    
+    # Step 3: Iterative matching process
+    for iteration in range(max_iterations):
+        if not remaining_indices:
+            break
+            
+        progress_made = False
+        
+        # Try direct matches first
+        transformed_pos_set = {tuple(coord) for coord in transformed_coords}
+        intersection_pos = original_pos_set.intersection(transformed_pos_set)
+        
+        # Process all possible direct matches
+        newly_matched = set()
+        for idx in remaining_indices:
+            trans_pos = tuple(transformed_coords[idx])
+            if trans_pos in intersection_pos and trans_pos in remaining_positions:
+                # Find matching original position
+                for j, coord in enumerate(coords):
+                    if tuple(coord) == trans_pos and j not in id_mapping.values():
+                        id_mapping[idx] = j
+                        newly_matched.add(idx)
+                        remaining_positions.remove(trans_pos)
+                        progress_made = True
+                        break
+        
+        remaining_indices -= newly_matched
+        
+        # If no direct matches found, try a shift
+        if not progress_made and remaining_indices:
+            remaining_pos_array = np.array(list(remaining_positions))
+            remaining_idx_array = np.array(list(remaining_indices))
+            remaining_transformed = transformed_coords[remaining_idx_array]
+            
+            # Find best shift by trying each remaining position as target
+            best_shift = None
+            max_matches = 0
+            
+            # Sample a subset of positions to try as shift targets (for efficiency)
+            n_samples = min(len(remaining_positions), 10)
+            sample_indices = np.random.choice(len(remaining_pos_array), n_samples, replace=False)
+            
+            for base_idx in range(min(5, len(remaining_transformed))):
+                base_pos = remaining_transformed[base_idx]
+                for target_pos in remaining_pos_array[sample_indices]:
+                    shift_vector = target_pos - base_pos
+                    shifted = remaining_transformed + shift_vector
+                    
+                    # Count matches using vectorized operations
+                    matches = sum(1 for coord in shifted if tuple(coord) in remaining_positions)
+                    
+                    if matches > max_matches:
+                        max_matches = matches
+                        best_shift = shift_vector
+            
+            # Apply best shift if found
+            if best_shift is not None and max_matches > 0:
+                for idx in remaining_indices:
+                    transformed_coords[idx] += best_shift
+                progress_made = True
+        
+        if not progress_made:
+            break
+    
+    # Validation
+    if len(id_mapping) != n_voxel:
+        missing = set(range(n_voxel)) - set(id_mapping.keys())
+        print(f"Failed to assign all voxels. Missing {len(missing)} indices: {missing}")
+        return None
+    
+    # Create final permutation array
+    permutation = np.array([id_mapping[i] for i in range(n_voxel)])
+    
+    if len(np.unique(permutation)) != n_voxel:
+        duplicates = [i for i in permutation if list(permutation).count(i) > 1]
+        print(f"Invalid permutation: contains duplicate IDs: {set(duplicates)}")
+        return None
+    
+    return permutation
+
