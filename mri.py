@@ -16,6 +16,7 @@ import copy
 import nibabel as nib
 import subprocess
 import mytool
+from typing import Union, Tuple
 
 # %%
 # io
@@ -216,27 +217,144 @@ def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
 
         
 # %% 
-def spatial_smooth_3d(input_data, mask=None, sigma=1, mode='reflect'):
-    '''smooth 3d mri data
-    input_data: 3d or 4d mri data
-    mask: mask for the data
-    '''
-    # add a new axis if the data is 3d
-    if np.ndim(input_data) == np.ndim(mask):
-        input_data = input_data[..., np.newaxis]
+def spatial_smooth_3d(input_data: np.ndarray, 
+                     mask: np.ndarray = None, 
+                     sigma: Union[float, Tuple[float, float, float]] = 1.0,
+                     mode: str = 'reflect',
+                     preserve_mask: bool = False) -> np.ndarray:
+    """Applies 3D spatial smoothing to MRI data with optional masking.
+
+    This function performs Gaussian smoothing on 3D or 4D MRI data while properly 
+    handling boundary effects at mask edges. For 4D data, smoothing is applied to 
+    each 3D volume independently.
+
+    Parameters
+    ----------
+    input_data : np.ndarray
+        Input data to smooth. Can be 3D or 4D array. If 4D, the last dimension
+        represents different volumes/timepoints.
+    mask : np.ndarray, optional
+        Binary mask specifying regions to smooth. Should be same shape as input_data
+        excluding the last dimension for 4D data. If None, all voxels are smoothed.
+    sigma : float or tuple of float, optional
+        Standard deviation for Gaussian kernel. Can be:
+        - Single float: Same sigma applied to all spatial dimensions
+        - Tuple of 3 floats: Different sigma for each spatial dimension (x,y,z)
+        Default is 1.0
+    mode : str, optional
+        Determines how edges are handled. Options: 'reflect' (default), 'constant',
+        'nearest', 'mirror', 'wrap'. See scipy.ndimage.gaussian_filter for details.
+    preserve_mask : bool, optional
+        If True, values in masked-out regions (mask==0) will retain their original 
+        values instead of being set to 0. Default is False.
+
+    Returns
+    -------
+    np.ndarray
+        Smoothed data with same shape as input_data
+
+    Raises
+    ------
+    ValueError
+        If input shapes are incompatible or parameters are invalid
+    TypeError
+        If input types are incorrect
+
+    Notes
+    -----
+    The smoothing operation is normalized at mask boundaries to prevent edge 
+    artifacts. This is done by dividing the smoothed data by a smoothed version 
+    of the mask.
+    """
+    # Input validation
+    if not isinstance(input_data, np.ndarray):
+        raise TypeError("input_data must be a numpy array")
     
-    # apply mask
-    if mask is None:
-        mask = np.ones(input_data.shape[:-1])
-    input_data[mask==0, :] = 0
+    ndim = input_data.ndim
+    if ndim not in (3, 4):
+        raise ValueError("input_data must be 3D or 4D array")
 
-    # smooth considering the boundary effect
-    data_smoothed = ndimage.gaussian_filter(input_data, sigma=(sigma, sigma, sigma, 0), mode=mode)
-    normalization_mask = ndimage.gaussian_filter((mask!=0).astype(float), sigma=sigma, mode=mode)
-    normalization_mask[normalization_mask == 0] = 1
-    data_smoothed /= normalization_mask[..., np.newaxis]
+    # Validate mode parameter
+    valid_modes = {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}
+    if mode not in valid_modes:
+        raise ValueError(f"mode must be one of {valid_modes}")
 
-    return np.squeeze(data_smoothed)
+    # Handle sigma specification
+    if isinstance(sigma, (int, float)):
+        sigma = (float(sigma),) * 3
+    elif isinstance(sigma, (tuple, list)) and len(sigma) == 3:
+        sigma = tuple(float(s) for s in sigma)
+    else:
+        raise ValueError("sigma must be a float or tuple of 3 floats")
+    
+    if any(s <= 0 for s in sigma):
+        raise ValueError("sigma values must be positive")
+
+    # Prepare data
+    working_data = input_data.copy()
+    if ndim == 3:
+        working_data = working_data[..., np.newaxis]
+    
+    # Validate and prepare mask
+    if mask is not None:
+        if not isinstance(mask, np.ndarray):
+            raise TypeError("mask must be a numpy array")
+        if mask.shape != working_data.shape[:-1]:
+            raise ValueError("mask shape must match input_data spatial dimensions")
+        mask = mask.astype(bool)
+    else:
+        # Only create mask if needed
+        mask = np.ones(working_data.shape[:-1], dtype=bool) if preserve_mask else None
+
+    # Store original values for masked regions if needed
+    masked_values = None
+    if preserve_mask and mask is not None:
+        masked_indices = ~mask
+        masked_values = working_data[masked_indices]
+
+    # Apply mask if needed
+    if mask is not None and not preserve_mask:
+        working_data = working_data.copy()  # Ensure we don't modify the input
+        working_data[~mask] = 0
+
+    # Prepare smoothing parameters
+    smooth_sigma = sigma + (0,)  # Add 0 for last dimension
+    
+    try:
+        # Smooth data
+        data_smoothed = ndimage.gaussian_filter(
+            working_data, 
+            sigma=smooth_sigma,
+            mode=mode
+        )
+        
+        # Apply normalization only if we have a mask and it's not all ones
+        if mask is not None and not np.all(mask):
+            # Calculate normalization factor
+            norm_mask = ndimage.gaussian_filter(
+                mask.astype(float), 
+                sigma=sigma,
+                mode=mode
+            )
+        
+            # Avoid division by zero
+            norm_mask[norm_mask < 1e-10] = 1
+            
+            # Apply normalization
+            data_smoothed /= norm_mask[..., np.newaxis]
+        
+        # Restore original values in masked regions if requested
+        if preserve_mask and masked_values is not None:
+            data_smoothed[masked_indices] = masked_values
+                
+    except Exception as e:
+        raise RuntimeError(f"Smoothing operation failed: {str(e)}")
+
+    # Return data in original dimensionality
+    if ndim == 3:
+        data_smoothed = data_smoothed[..., 0]
+
+    return data_smoothed
 
 
 def roi_describe(data, atlas_data, method='nanmean', key=None, skip_key0=True):
