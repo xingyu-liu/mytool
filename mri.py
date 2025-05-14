@@ -17,6 +17,7 @@ import nibabel as nib
 import subprocess
 import mytool
 from typing import Union, Tuple
+from gdist import compute_gdist
 
 # %%
 # io
@@ -34,7 +35,7 @@ def determine_mri_cifti_type(f_path):
     return any(f_path.endswith(ext) for ext in cifti_extensions)
 
 
-def load_mri_data(f_path, bs=None):
+def load_mri_data(f_path, bs=None, zeroize=False):
     '''
     f_path: file path
     bs: brain structures, only for cifti file. Should be a list of strings.
@@ -61,24 +62,40 @@ def load_mri_data(f_path, bs=None):
     
     elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii') or f_name.endswith('.dlabel.nii'):
         data_dict = {}
+        data_dict['zeroize'] = zeroize
         reader = CiftiReader(f_path)
 
-        data = reader.get_data()
-        if bs is not None:
+        # data = reader.get_data()
+        # if bs is not None:
+        #     data_dict['bs'] = bs
+        #     data_dict['bm'] = reader.brain_models(data_dict['bs'])
+
+        #     data_concat = []
+        #     for struci in data_dict['bs']:
+        #         brain_model = reader.brain_models([struci])[0]
+        #         offset = brain_model.index_offset
+        #         count = brain_model.index_count
+        #         data_concat.append(data[:, offset:offset+count])
+        #     data = np.concatenate(data_concat, axis=-1)
+        
+        # else:
+        #     data_dict['bs'] = reader.brain_structures
+        #     data_dict['bm'] = reader.brain_models()
+        
+        if bs is None:
+            data_dict['bs'] = reader.brain_structures
+            data_dict['bm'] = reader.brain_models()
+        else:
             data_dict['bs'] = bs
             data_dict['bm'] = reader.brain_models(data_dict['bs'])
 
-            data_concat = []
-            for struci in data_dict['bs']:
-                brain_model = reader.brain_models([struci])[0]
-                offset = brain_model.index_offset
-                count = brain_model.index_count
-                data_concat.append(data[:, offset:offset+count])
-            data = np.concatenate(data_concat, axis=-1)
-        
-        else:
-            data_dict['bs'] = reader.brain_structures
-            data_dict['bm'] = reader.brain_models()
+        data = []
+        for struci in data_dict['bs']:
+            datai = reader.get_data(struci, zeroize=zeroize)
+            if not zeroize:
+                datai = datai[0]
+            data.append(datai)
+        data = np.concatenate(data, axis=-1)
 
         data_dict['data'] = data.T
         data_dict['volume'] = reader.volume
@@ -108,19 +125,23 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None, print_f=Fa
         img.add_gifti_data_array(nib.gifti.GiftiDataArray(data=data.astype(np.float32), intent='NIFTI_INTENT_NONE'))
         img.to_filename(f_path)
     
-    elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii'):
+    elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii') or f_name.endswith('.dlabel.nii'):
         # if data is not a dict, raise error
         if not isinstance(data, dict):
             raise ValueError('data should be a dict, including data, bm, (volume)')
+        
+        if data['zeroize']:
+            raise ValueError('zeroize should be False when saving CIFTI file, otherwise the brain model will be incorrect')
 
-        # make sure bm starts from 0 and concatenated correctly
-        data['bm'][0].index_offset = 0
-        if len(data['bm']) > 1:
-            for i in range(1, len(data['bm'])):
-                data['bm'][i].index_offset = data['bm'][i-1].index_offset + data['bm'][i-1].index_count
+        # # make sure bm starts from 0 and concatenated correctly
+        index_offset = 0
+        for bm_id in range(len(data['bm'])):
+            data['bm'][bm_id].index_offset = index_offset
+
+            index_offset += data['bm'][bm_id].index_count
         if 'volume' not in data.keys():
             data['volume'] = None
-                    
+
         save2cifti(f_path, data['data'], data['bm'], volume=data['volume'])
 
     if print_f:
@@ -1094,3 +1115,26 @@ def spin_permutation_voxel(coords, max_iterations=50):
     
     return permutation
 
+# %%
+def get_geodesic_dist(surf_f, source_node, target_node):
+    # surf_f or faces and vertices must be provided
+
+    if surf_f is not None:
+        if surf_f.endswith('.gii'):
+            surfp = nib.load(surf_f).agg_data()
+        else:
+            surfp = nib.freesurfer.read_geometry(surf_f)
+        vertices, faces = surfp[0], surfp[1]
+
+    vertices = vertices.astype(np.float64)
+    faces = faces.astype(np.int32)
+
+    dists = []
+    for nodei in source_node:
+        dist = compute_gdist(vertices, 
+                            faces, 
+                            np.array([nodei], dtype=np.int32),
+                            np.array(target_node, dtype=np.int32))
+        dists.append(dist)
+
+    return dists
