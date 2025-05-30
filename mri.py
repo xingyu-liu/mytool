@@ -9,15 +9,14 @@ Created on Fri May 15 23:25:50 2020
 import os
 import numpy as np
 from nibabel.cifti2 import cifti2
-from scipy.signal import fftconvolve
-from scipy import ndimage
+import scipy
 # from nipy.modalities.fmri.hemodynamic_models import spm_hrf
-import copy
 import nibabel as nib
 import subprocess
 import mytool
 from typing import Union, Tuple
 from gdist import compute_gdist
+from typing import Optional
 
 # %%
 # io
@@ -343,7 +342,7 @@ def spatial_smooth_3d(input_data: np.ndarray,
     
     try:
         # Smooth data
-        data_smoothed = ndimage.gaussian_filter(
+        data_smoothed = scipy.ndimage.gaussian_filter(
             working_data, 
             sigma=smooth_sigma,
             mode=mode
@@ -352,7 +351,7 @@ def spatial_smooth_3d(input_data: np.ndarray,
         # Apply normalization only if we have a mask and it's not all ones
         if mask is not None and not np.all(mask):
             # Calculate normalization factor
-            norm_mask = ndimage.gaussian_filter(
+            norm_mask = scipy.ndimage.gaussian_filter(
                 mask.astype(float), 
                 sigma=sigma,
                 mode=mode
@@ -1138,3 +1137,144 @@ def get_geodesic_dist(surf_f, source_node, target_node):
         dists.append(dist)
 
     return dists
+
+
+# %%
+
+def func_concate_prep(
+    func_data: np.ndarray,
+    func_mask: Optional[np.ndarray] = None,
+    detrend: bool = True,
+    sigma: float = 0.0,
+    zscore: bool = True,
+    set_unchanged_to_nan: bool = False
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    
+    """
+    Prepare functional data by applying preprocessing steps including masking, smoothing, detrending, and normalization.
+
+    Parameters
+    ----------
+    func_data : np.ndarray
+        Functional data with time as the last dimension. Must be 3D or 4D array.
+    func_mask : np.ndarray, optional
+        Binary mask for the functional data. Must have same spatial dimensions as func_data.
+        If None, all voxels are used (default).
+    detrend : bool, default=True
+        Whether to remove linear trends from the time series.
+    sigma : float, default=0.0
+        Standard deviation for Gaussian smoothing kernel in voxel units.
+        If 0, no smoothing is applied.
+    zscore : bool, default=True
+        Whether to z-score normalize the time series.
+    set_unchanged_to_nan : bool, default=False
+        Whether to set voxels with constant values to NaN.
+
+    Returns
+    -------
+    func_data_masked : np.ndarray, shape = (N, T) if 4D input, (N,) if 3D input
+        Preprocessed data for non-zero mask voxels.
+        N is number of non-zero voxels and T is number of timepoints.
+    func_mask_nonzero: np.ndarray, shape = (N,)
+        Boolean mask indicating non-zero voxels.
+
+    Raises
+    ------
+    ValueError
+        If func_data is not 3D or 4D array
+        If func_mask shape doesn't match func_data spatial dimensions
+        If sigma is negative
+    
+    Notes
+    -----
+    Processing steps are applied in this order:
+    1. Input validation
+    2. Expand dimensions if 3D input
+    3. Apply mask
+    4. Spatial smoothing (if sigma > 0)
+    5. Extract non-zero voxels
+    6. Detrending (if detrend=True)
+    7. Z-score normalization (if zscore=True)
+    8. Set constant voxels to NaN (if set_unchanged_to_nan=True)
+
+    Examples
+    --------
+    >>> data = np.random.rand(64, 64, 32, 100)  # 4D functional data
+    >>> mask = np.ones((64, 64, 32))  # 3D binary mask
+    >>> processed_data, nonzero_mask = func_concate_prep(data, mask, sigma=1.5)
+    """
+    # Input validation
+    if not (3 <= func_data.ndim <= 4):
+        raise ValueError("func_data must be 3D or 4D array, got shape {func_data.shape}")
+    
+    if sigma < 0:
+        raise ValueError(f"sigma must be non-negative, got {sigma}")
+
+    # Ensure 4D data
+    ndim = func_data.ndim
+    func_data = np.asarray(func_data)
+    if ndim == 3:
+        func_data = func_data[..., np.newaxis]
+    
+    # Create or validate mask
+    if func_mask is None:
+        func_mask = np.ones(func_data.shape[:-1], dtype=bool)
+    else:
+        func_mask = np.asarray(func_mask)
+        if func_mask.shape != func_data.shape[:-1]:
+            raise ValueError(
+                f"func_mask shape {func_mask.shape} must match func_data spatial "
+                f"dimensions {func_data.shape[:-1]}"
+            )
+
+    # Apply spatial smoothing if requested
+    if sigma > 0:
+        func_data = mytool.mri.spatial_smooth_3d(
+            func_data, 
+            mask=func_mask,
+            sigma=sigma,
+            mode='nearest'
+        )
+
+    # Extract non-zero voxels
+    func_data_masked = func_data[func_mask != 0, :]
+
+    # Apply detrending
+    if detrend:
+        func_data_masked = scipy.signal.detrend(func_data_masked, axis=-1)
+
+    # Apply z-score normalization
+    if zscore:
+        with np.errstate(invalid='ignore'):  # Ignore warning for constant voxels
+            func_data_masked = scipy.stats.zscore(func_data_masked, axis=-1, nan_policy='omit')
+
+    # Set constant voxels to NaN
+    if set_unchanged_to_nan:
+        with np.errstate(invalid='ignore'):
+            std_vals = np.nanstd(func_data_masked, axis=-1)
+            func_data_masked[std_vals == 0, :] = np.nan
+
+    if ndim == 3:
+        func_data_masked = func_data_masked[..., 0]
+
+    return func_data_masked, func_mask[func_mask != 0]
+
+
+def hemilize_atlas(atlas_data, roiinfo, hemi):
+    '''
+    atlas_data: the atlas data in 3D
+    roiinfo: the roi info of the atlas. DataFrame with columns 'hemi' and 'roi_mask'
+    hemi: the hemisphere to be set to 1
+
+    return: the atlas data with the specified hemisphere being 1, 
+            the other hemisphere being 2, 
+            and the rest being 0
+    '''
+
+    atlas_hemi = roiinfo[roiinfo['hemi']==hemi].reset_index(drop=True)
+    atlas_data_hemi = np.zeros(atlas_data.shape)
+    atlas_data_hemi[atlas_data!=0] = -1
+    atlas_data_hemi[np.isin(atlas_data, atlas_hemi['roi_mask'].values)] = 1
+    atlas_data_hemi = atlas_data_hemi.astype(int)
+    
+    return atlas_data_hemi

@@ -14,7 +14,7 @@ import copy
 import matplotlib.pyplot as plt
 import resource
 
-from typing import Optional, Literal
+from typing import Optional, Literal, Any
 from numpy.typing import NDArray
 
 # %%
@@ -1055,4 +1055,53 @@ def calculate_laplacian_regularity(data, mask: Optional[np.ndarray] = None) -> f
     regularity = np.nanmean(laplacian[interior_mask]**2)
     
     return regularity
+
+
+def perform_linDimReduc(data, method='PCA', n_dim_kept=None, zscore_sample=True, zscore_feature=False, whiten=False):
+    """Perform linear dimensionality reduction (PCA or ICA) on input data.
+    
+    Parameters
+    ----------
+    data : array-like
+        Input data array of shape (n_samples, n_features)
+    method : {'PCA', 'ICA'}, default='PCA'
+        Dimensionality reduction method
+    n_dim_kept : int, optional
+        Number of dimensions to keep. If None, uses min(n_samples, n_features)
+    zscore_sample : bool, default=True
+        Whether to z-score normalize samples (rows)
+    zscore_feature : bool, default=False
+        Whether to z-score normalize features (columns)
+    whiten : bool, default=False
+        Whether to whiten the data (only for PCA)
+        
+    Returns
+    -------
+    tuple
+        - data_preproc : array
+            Preprocessed data
+        - dim_model : object
+            Fitted dimensionality reduction model
+    """
+    from sklearn import decomposition
+    
+    # Preprocess data
+    data_preproc = data.copy()
+    if zscore_sample:
+        data_preproc = np.nan_to_num(stats.zscore(data_preproc, axis=0))
+    if zscore_feature:
+        data_preproc = np.nan_to_num(stats.zscore(data_preproc, axis=1))
+
+    # Set dimensions
+    if n_dim_kept is None:
+        n_dim_kept = np.min(data_preproc.shape)
+
+    # Fit model
+    if method == 'PCA':
+        dim_model = decomposition.PCA(n_components=n_dim_kept, whiten=whiten)
+    elif method == 'ICA':
+        dim_model = decomposition.FastICA(n_components=n_dim_kept)
+    dim_model.fit(data_preproc)
+
+    return data_preproc, dim_model
 
