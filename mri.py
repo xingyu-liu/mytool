@@ -225,13 +225,13 @@ def save_fslr_map(df, save_col_name, mask, bm, save_path, scale='roi'):
     mask: np.array data
     bm: corresponding brain model data of the mask
     scale: df must have the column indicating the scale. For scale='roi', 
-        the named column is 'roi_mask'.
+        the named column is 'key'.
     '''
 
     if scale == 'roi':
         data2save = np.full(mask.shape, np.nan)
-        for _, roi in enumerate(df['roi_mask'].unique()):
-            data2save[mask==roi] = df.loc[df['roi_mask']==roi, save_col_name]
+        for _, roi in enumerate(df['key'].unique()):
+            data2save[mask==roi] = df.loc[df['key']==roi, save_col_name]
 
         save2cifti(save_path, data2save[None,...], bm)
 
@@ -1140,7 +1140,6 @@ def get_geodesic_dist(surf_f, source_node, target_node):
 
 
 # %%
-
 def func_concate_prep(
     func_data: np.ndarray,
     func_mask: Optional[np.ndarray] = None,
@@ -1203,9 +1202,9 @@ def func_concate_prep(
     >>> mask = np.ones((64, 64, 32))  # 3D binary mask
     >>> processed_data, nonzero_mask = func_concate_prep(data, mask, sigma=1.5)
     """
-    # Input validation
-    if not (3 <= func_data.ndim <= 4):
-        raise ValueError("func_data must be 3D or 4D array, got shape {func_data.shape}")
+    # # Input validation
+    # if not (3 <= func_data.ndim <= 4):
+    #     raise ValueError("func_data must be 3D or 4D array, got shape {func_data.shape}")
     
     if sigma < 0:
         raise ValueError(f"sigma must be non-negative, got {sigma}")
@@ -1213,7 +1212,7 @@ def func_concate_prep(
     # Ensure 4D data
     ndim = func_data.ndim
     func_data = np.asarray(func_data)
-    if ndim == 3:
+    if ndim == 3 or ndim == 1:
         func_data = func_data[..., np.newaxis]
     
     # Create or validate mask
@@ -1254,7 +1253,7 @@ def func_concate_prep(
             std_vals = np.nanstd(func_data_masked, axis=-1)
             func_data_masked[std_vals == 0, :] = np.nan
 
-    if ndim == 3:
+    if ndim == 3 or ndim == 1:
         func_data_masked = func_data_masked[..., 0]
 
     return func_data_masked, func_mask[func_mask != 0]
@@ -1263,7 +1262,7 @@ def func_concate_prep(
 def hemilize_atlas(atlas_data, roiinfo, hemi):
     '''
     atlas_data: the atlas data in 3D
-    roiinfo: the roi info of the atlas. DataFrame with columns 'hemi' and 'roi_mask'
+    roiinfo: the roi info of the atlas. DataFrame with columns 'hemi' and 'key'
     hemi: the hemisphere to be set to 1
 
     return: the atlas data with the specified hemisphere being 1, 
@@ -1274,7 +1273,7 @@ def hemilize_atlas(atlas_data, roiinfo, hemi):
     atlas_hemi = roiinfo[roiinfo['hemi']==hemi].reset_index(drop=True)
     atlas_data_hemi = np.zeros(atlas_data.shape)
     atlas_data_hemi[atlas_data!=0] = -1
-    atlas_data_hemi[np.isin(atlas_data, atlas_hemi['roi_mask'].values)] = 1
+    atlas_data_hemi[np.isin(atlas_data, atlas_hemi['key'].values)] = 1
     atlas_data_hemi = atlas_data_hemi.astype(int)
     
     return atlas_data_hemi

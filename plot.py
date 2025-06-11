@@ -109,7 +109,8 @@ def get_symetric_vbound(data, percentiles=[2, 98]):
 # plot 3d using plt
 def scatter3d_plt(data_vec, loc, hemi, loc4each=False, mask_underlay=False,
                    nrows=1, ncols=1, cmap='magma', perspective='default', 
-                   ms=5, vmin=None, vmax=None, vcenter=None, colorbar=True, figsize=None):
+                   vmin=None, vmax=None, vcenter=None, colorbar=True, figsize=None,
+                   kws_scatter=None, kws_colorbar=None):
     '''
     Plot 3D scatter plots of data vectors at specified locations.
 
@@ -151,6 +152,20 @@ def scatter3d_plt(data_vec, loc, hemi, loc4each=False, mask_underlay=False,
     if nrows == 1 and ncols == 1: 
         axes = np.array([axes])
 
+    if kws_scatter is None:
+        kws_scatter = {}
+    if 's' not in kws_scatter.keys():
+        kws_scatter['s'] = 5
+
+    if kws_colorbar is None:
+        kws_colorbar = {}
+    if 'orientation' not in kws_colorbar.keys():
+        kws_colorbar['orientation'] = 'horizontal'
+    if 'pad' not in kws_colorbar.keys():
+        kws_colorbar['pad'] = 0.1
+    if 'shrink' not in kws_colorbar.keys():
+        kws_colorbar['shrink'] = 0.8
+
     for i, ax in enumerate(axes.flatten()):
         if i >= len(data_vec):
             ax.axis('off')
@@ -162,7 +177,7 @@ def scatter3d_plt(data_vec, loc, hemi, loc4each=False, mask_underlay=False,
         # Plot the underlay mask
         if mask_underlay:
             ax.scatter(loci[0], loci[1], loci[2], c='silver', edgecolor='none', 
-                      s=ms, alpha=0.3, depthshade=False)
+                      s=kws_scatter['s'], alpha=0.3, depthshade=False)
         
         # Compute value range for color mapping
         if vmax is None:
@@ -180,12 +195,10 @@ def scatter3d_plt(data_vec, loc, hemi, loc4each=False, mask_underlay=False,
         
         # Plot scalar data
         scatter = ax.scatter(loci[0], loci[1], loci[2], c=datai, cmap=cmap, 
-                           edgecolor='none', vmin=vmini, vmax=vmaxi, s=ms, 
-                           alpha=1, depthshade=False)
+                             vmin=vmini, vmax=vmaxi, **kws_scatter)
         
         if colorbar:
-            plt.colorbar(scatter, ax=ax, orientation='horizontal', 
-                        pad=0.1, shrink=0.8)
+            plt.colorbar(scatter, ax=ax, **kws_colorbar)
         
         # Set view and eye
         adjust_3dmri_plot(fig, np.array([ax]), hemi, perspective=perspective, 
