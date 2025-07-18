@@ -1057,50 +1057,82 @@ def calculate_laplacian_regularity(data, mask: Optional[np.ndarray] = None) -> f
     return regularity
 
 
-def perform_linDimReduc(data, method='PCA', n_dim_kept=None, zscore_sample=True, zscore_feature=False, whiten=False):
-    """Perform linear dimensionality reduction (PCA or ICA) on input data.
-    
+def perform_linDimReduc(
+    data: NDArray[np.float_],
+    method: Literal['PCA', 'ICA'] = 'PCA',
+    n_dim_kept: Optional[int] = None,
+    zscore_sample: bool = True,
+    zscore_feature: bool = False,
+    whiten: bool = False
+) -> tuple[NDArray[np.float_], NDArray[np.float_], Any]:
+    """Perform linear dimensionality reduction on input data.
+
     Parameters
     ----------
-    data : array-like
+    data : NDArray[np.float_]
         Input data array of shape (n_samples, n_features)
     method : {'PCA', 'ICA'}, default='PCA'
-        Dimensionality reduction method
+        Dimensionality reduction method to use
     n_dim_kept : int, optional
         Number of dimensions to keep. If None, uses min(n_samples, n_features)
-    zscore_sample : bool, default=True
+    zscore_sample : bool, default=False
         Whether to z-score normalize samples (rows)
     zscore_feature : bool, default=False
         Whether to z-score normalize features (columns)
     whiten : bool, default=False
-        Whether to whiten the data (only for PCA)
-        
+        Whether to whiten the data (only used for PCA)
+
     Returns
     -------
     tuple
-        - data_preproc : array
-            Preprocessed data
-        - dim_model : object
+        - data_preproc : NDArray[np.float_]
+            Preprocessed data array
+        - data_transformed : NDArray[np.float_]
+            Transformed data array
+        - dim_model : Any
             Fitted dimensionality reduction model
+
+    Raises
+    ------
+    ValueError
+        If method is not 'PCA' or 'ICA'
+        If data is not 2D
+        If n_dim_kept is greater than min(n_samples, n_features)
     """
     from sklearn import decomposition
+
+    # Input validation
+    if data.ndim != 2:
+        raise ValueError("Input data must be 2D array")
     
+    if method not in ['PCA', 'ICA']:
+        raise ValueError("method must be either 'PCA' or 'ICA'")
+
     # Preprocess data
     data_preproc = data.copy()
+
     if zscore_sample:
         data_preproc = np.nan_to_num(stats.zscore(data_preproc, axis=0))
+
     if zscore_feature:
         data_preproc = np.nan_to_num(stats.zscore(data_preproc, axis=1))
 
-    # Set dimensions
+    # Set default n_dim_kept if not provided
     if n_dim_kept is None:
         n_dim_kept = np.min(data_preproc.shape)
+    elif n_dim_kept > np.min(data_preproc.shape):
+        raise ValueError(
+            f"n_dim_kept ({n_dim_kept}) cannot be greater than "
+            f"min(n_samples, n_features) ({np.min(data_preproc.shape)})"
+        )
 
-    # Fit model
+    # Fit dimensionality reduction model
     if method == 'PCA':
         dim_model = decomposition.PCA(n_components=n_dim_kept, whiten=whiten)
-    elif method == 'ICA':
+    elif method == 'ICA':  # method == 'ICA'
         dim_model = decomposition.FastICA(n_components=n_dim_kept)
+    
+    # Fit and transform data
     dim_model.fit(data_preproc)
 
     return data_preproc, dim_model
