@@ -1277,3 +1277,33 @@ def hemilize_atlas(atlas_data, roiinfo, hemi):
     atlas_data_hemi = atlas_data_hemi.astype(int)
     
     return atlas_data_hemi
+
+
+def check_image_resolution(
+    imagef: str,
+) -> list:
+    """Check image resolution.
+    
+    Args:
+        imagef: Input image file
+        
+    Returns:
+        List of floats representing image resolution (length may vary depending on image dimensionality)
+    """
+    # Use 3dinfo to get the resolution of the image
+    command_3dinfo = [
+        '3dinfo',
+        '-ad3',
+        str(imagef)
+    ]
+    result = subprocess.run(command_3dinfo, capture_output=True, text=True)
+    if result.returncode == 0:
+        # Parse the output and convert to floats
+        resolution_values = result.stdout.strip().split()
+        try:
+            return [float(res) for res in resolution_values]
+        except Exception as e:
+            raise ValueError(f"Failed to convert resolution values to float: {resolution_values}") from e
+    else:
+        raise RuntimeError(f"Image resolution retrieval failed: {result.stderr}")
+    
