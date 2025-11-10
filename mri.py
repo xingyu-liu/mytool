@@ -101,7 +101,12 @@ def load_mri_data(f_path, bs=None, zeroize=False):
 
         return data_dict
 
-def save_mri_data(data, f_path, affine=None, header=None, ref_f=None, print_f=False):
+def save_mri_data(data, f_path, affine=None, header=None, ref_f=None, 
+    dtype=None, print_f=False):
+
+    # if dtype is not provided, use the data dtype
+    if dtype is None:
+        dtype = data.dtype
 
     f_name = os.path.basename(f_path)
 
@@ -117,12 +122,12 @@ def save_mri_data(data, f_path, affine=None, header=None, ref_f=None, print_f=Fa
     # save data
     if f_name.endswith('.nii.gz'):
         img = nib.Nifti1Image(data, affine, header=header)
-        nib.save(img, f_path)
+        img.to_filename(f_path, dtype=dtype)
 
     elif f_name.endswith('.gii'):
         img = nib.gifti.GiftiImage()
         img.add_gifti_data_array(nib.gifti.GiftiDataArray(data=data.astype(np.float32), intent='NIFTI_INTENT_NONE'))
-        img.to_filename(f_path)
+        img.to_filename(f_path, dtype=dtype)
     
     elif f_name.endswith('.dtseries.nii') or f_name.endswith('.dscalar.nii') or f_name.endswith('.dlabel.nii'):
         # if data is not a dict, raise error
